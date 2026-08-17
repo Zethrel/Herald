@@ -61,10 +61,18 @@ describe('methodGuideUrl', () => {
 });
 
 describe('isConfirmed', () => {
-  it('separates the four checked by hand from the derived rest', () => {
+  it('covers every spec, all checked against the live site', () => {
     assert.equal(isConfirmed('method', specByKey('deathknight.blood')), true);
-    assert.equal(isConfirmed('method', specByKey('mage.fire')), false);
-    assert.equal(METHOD_CONFIRMED.size, 4);
+    assert.equal(isConfirmed('method', specByKey('mage.fire')), true);
+    assert.equal(METHOD_CONFIRMED.size, 39);
+  });
+
+  it('leaves a spec added later unconfirmed until someone checks it', () => {
+    // The guard this list exists for: a derived URL is not a verified one.
+    assert.equal(
+      METHOD_CONFIRMED.has(guideSlug({ name: 'Tinkering', className: 'Tinker' })),
+      false,
+    );
   });
 
   it('claims nothing for a source with no pattern', () => {
@@ -87,10 +95,15 @@ describe('guideUrl', () => {
 });
 
 describe('allMethodGuides', () => {
-  it('reports which slugs are confirmed and which are derived', () => {
+  it('has a checked URL for every spec in the catalogue', () => {
     const all = allMethodGuides();
+    const unchecked = all.filter((entry) => !entry.confirmed);
 
     assert.equal(all.length, 39);
-    assert.equal(all.filter((entry) => entry.confirmed).length, 4);
+    assert.deepEqual(
+      unchecked.map((entry) => entry.slug),
+      [],
+      'a spec has no verified Method URL — run `npm run check-guides` and add its slug to METHOD_CONFIRMED',
+    );
   });
 });

@@ -356,13 +356,18 @@ guessing selectors is not: a wrong URL 404s loudly and is fixed with one line in
 `METHOD_OVERRIDES`, while a wrong selector returns the wrong flask and says
 nothing.
 
-Four slugs were checked by hand; the rest follow the pattern and render as
-*unverified link* until `npm run check-guides` says otherwise. That script
-requests each URL once, a second apart, reads no page content, and prints the
+**All 39 were checked against the live site on 2026-08-17** — every one
+answered, no 404s, no exceptions to the pattern. `npm run check-guides` re-runs
+that: one request per URL a second apart, no page content read, printing the
 confirmed slugs to paste back plus any 404s needing an override. It separates a
 404 (the slug is wrong) from a 403 or 5xx (the network is in the way) and stops
 outright when nothing gets through — turning a proxy block into a list of
 "corrections" would be worse than no answer.
+
+The confirmed list is explicit rather than "the pattern is verified", so a spec
+added by a future patch is *unverified* until someone checks it. A test fails in
+that case and names the fix, instead of the bot quietly linking somewhere that
+may not exist.
 
 **There is still no scraper, deliberately.** Reading the recommendation off the
 page needs HTML selectors, and those can only be written against real markup and
@@ -505,7 +510,7 @@ It refuses to start without `OWNER_IDS`: a bot that cannot tell anyone about an
 unapproved invite is worse than one that will not boot.
 
 ```sh
-npm test                  # 275 tests, no network needed
+npm test                  # 276 tests, no network needed
 ```
 
 ### Discord Developer Portal

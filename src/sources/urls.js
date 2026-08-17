@@ -22,22 +22,75 @@ export function guideSlug(spec) {
 //
 //   https://www.method.gg/guides/<spec>-<class>/stats-races-and-consumables
 //
-// Confirmed by hand against the live site. Everything else follows the same
-// pattern and is derived until the checker says otherwise.
+// The pattern held for every spec when checked: see METHOD_CONFIRMED below.
 
 export const METHOD_BASE = 'https://www.method.gg/guides';
 export const METHOD_PAGE = 'stats-races-and-consumables';
 
+// Every slug below returned 200 when checked against the live site on
+// 2026-08-17: all 39 specs, no 404s, no exceptions to the pattern. The list is
+// explicit rather than "the pattern is verified" on purpose -- if a patch adds
+// a spec, its derived URL is unverified until someone checks it, and the test
+// suite says so rather than the bot quietly linking somewhere that may not
+// exist.
 export const METHOD_CONFIRMED = new Set([
+  // Death Knight
   'blood-death-knight',
   'frost-death-knight',
   'unholy-death-knight',
+  // Demon Hunter
+  'havoc-demon-hunter',
+  'vengeance-demon-hunter',
+  // Druid
+  'balance-druid',
+  'feral-druid',
+  'guardian-druid',
   'restoration-druid',
+  // Evoker
+  'devastation-evoker',
+  'preservation-evoker',
+  'augmentation-evoker',
+  // Hunter
+  'beast-mastery-hunter',
+  'marksmanship-hunter',
+  'survival-hunter',
+  // Mage
+  'arcane-mage',
+  'fire-mage',
+  'frost-mage',
+  // Monk
+  'brewmaster-monk',
+  'mistweaver-monk',
+  'windwalker-monk',
+  // Paladin
+  'holy-paladin',
+  'protection-paladin',
+  'retribution-paladin',
+  // Priest
+  'discipline-priest',
+  'holy-priest',
+  'shadow-priest',
+  // Rogue
+  'assassination-rogue',
+  'outlaw-rogue',
+  'subtlety-rogue',
+  // Shaman
+  'elemental-shaman',
+  'enhancement-shaman',
+  'restoration-shaman',
+  // Warlock
+  'affliction-warlock',
+  'demonology-warlock',
+  'destruction-warlock',
+  // Warrior
+  'arms-warrior',
+  'fury-warrior',
+  'protection-warrior',
 ]);
 
 /**
- * Slugs that do not follow the pattern. Empty because none are known yet -- the
- * point of the checker is to fill this in with facts rather than guesses.
+ * Slugs that do not follow the pattern. Empty, and now known to be empty rather
+ * than merely unwritten: all 39 derived URLs answered 200 on 2026-08-17.
  *
  * @type {Record<string, string>} spec key -> slug
  */
