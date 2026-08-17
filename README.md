@@ -14,6 +14,10 @@ one place — `src/ranks/membership.js` — and it holds for joins, for the
 `/rank backfill` sweep, and for `/setup run` on a server that has been running
 for years.
 
+**It only runs where it is allowed to.** Herald is private: it works in the
+servers on its allowlist and reports itself to its owners anywhere else. See
+[Approved servers](#approved-servers) and [Licence](#licence).
+
 > The name is provisional. It lives in exactly one place — `BOT_NAME` in
 > `.env`, falling back to `src/branding.js` — so renaming Herald later is one
 > line and touches nothing else.
@@ -64,9 +68,11 @@ needs editing.
 | `/config behaviour ...` | Exclusive ranks on/off, default-rank-removal on/off. |
 | `/config view` | The current configuration. |
 | `/rank backfill [confirm]` | Gives the default rank to members who have **no** rank at all. Reports and does nothing without `confirm:true`. |
+| `/guilds list\|approve\|revoke\|leave` | The server allowlist. Bot owners only — see below. |
 | `/about` | What the bot does. |
 
-Everything except `/about` requires **Manage Server**.
+Everything except `/about` requires **Manage Server**; `/guilds` additionally
+refuses anyone who is not in `OWNER_IDS`.
 
 ### Setup is additive, and safe to re-run
 
@@ -83,19 +89,64 @@ it did not make, and it never changes a member's roles.
 If your ranks are named something else entirely, bind them by hand with
 `/config rank` and then run setup — it will keep those bindings.
 
+## Approved servers
+
+Herald is not public. The licence says who may use it; this is the half that
+enforces it while the bot is running, because Discord itself offers no way to
+stop someone adding a bot to a server they own.
+
+**The allowlist is `APPROVED_GUILDS` in `.env`, plus whatever `/guilds approve`
+has added.** An empty allowlist approves *nothing* — it does not mean "allow
+everything". In any server that is not on it, the bot:
+
+1. works out who invited it, from that server's audit log where it can;
+2. DMs every id in `OWNER_IDS` — and posts to `ALERT_WEBHOOK_URL` if set —
+   with the server name, id, member count, server owner and inviter;
+3. leaves immediately. Set `UNAPPROVED_SERVER_ACTION=report` to have it stay
+   instead, in which case every command there is refused.
+
+That check runs on invite **and at every startup**, which is what catches a
+server the bot was added to while it was offline: no join event is waiting for
+it when it comes back, so it re-checks the whole list itself. Being removed
+from a server that *is* approved is reported too, so a quiet removal does not
+go unnoticed.
+
+```
+/guilds list                          every server the bot is in, ✅ or ⚠️
+/guilds approve <server_id> [note]     let it work there
+/guilds revoke  <server_id> [stay]     take it off the list, and leave
+/guilds leave   <server_id>            leave without changing the list
+```
+
+Only the ids in `OWNER_IDS` may run those; anyone else gets a refusal. Entries
+that came from `APPROVED_GUILDS` cannot be revoked by command — the deployment's
+own list wins over a runtime one, so a stolen owner account cannot quietly
+widen it.
+
+Server ids come from Discord's *Copy Server ID* (enable Developer Mode in
+Settings → Advanced), or straight out of the alert you were sent.
+
+**Put your own server in `APPROVED_GUILDS` before the first start.** `/guilds`
+is a slash command, so it has to be run from a server the bot is in — start with
+an empty allowlist and the default action and the bot will dutifully leave
+everywhere, including the server you meant to run it from.
+
 ## Running it
 
 Node 22 or newer. `discord.js` is the only dependency.
 
 ```sh
 npm install
-cp .env.example .env      # fill in DISCORD_TOKEN and DISCORD_CLIENT_ID
+cp .env.example .env      # DISCORD_TOKEN, DISCORD_CLIENT_ID, OWNER_IDS are required
 npm run deploy            # register the slash commands (once, and after changing them)
 npm start
 ```
 
+It refuses to start without `OWNER_IDS`: a bot that cannot tell anyone about an
+unapproved invite is worse than one that will not boot.
+
 ```sh
-npm test                  # 55 tests, no network needed
+npm test                  # 73 tests, no network needed
 ```
 
 ### Discord Developer Portal
@@ -120,16 +171,19 @@ npm test                  # 55 tests, no network needed
 ### State
 
 Per-server settings — which role is which rank, where the welcome message is —
-live in `data/guilds.json`, written atomically. Back it up, or the bot will
-forget which message to watch and you will need one `/welcome post` to rebind.
-Everything else is re-derived from the server itself.
+live in `data/guilds.json`, written atomically, alongside the runtime half of
+the allowlist. Back it up: losing it means the bot forgets which message to
+watch (one `/welcome post` rebinds it) and forgets every approval made with
+`/guilds approve`. Approvals in `APPROVED_GUILDS` survive regardless, which is
+the argument for keeping the servers that matter in the environment file.
 
 ## How it is put together
 
 ```
 src/
 ├── blueprint.js       what a set-up server looks like — pure data
-├── store.js           per-server settings, JSON on disk
+├── store.js           per-server settings and the allowlist, JSON on disk
+├── access/            which servers may run the bot, and telling you when one may not
 ├── plan/              diff the blueprint against a live server (pure)
 ├── apply/             execute the diff
 ├── ranks/             who gets which rank, and when (pure)
@@ -156,4 +210,10 @@ order and the bot fights itself. There is a test named after this case.
 
 ## Licence
 
-MIT. See [LICENSE](LICENSE).
+**Not open source.** Source-available: you can read this repository, and that is
+all reading it grants you. Running Herald — or a modified or re-branded copy of
+it — requires a written grant from the copyright holder, and that grant can be
+withdrawn. No redistribution, no resale, no hosting it for anyone else.
+
+See [LICENSE](LICENSE) for the terms, and *Approved servers* above for how the
+bot holds the same line at runtime.

@@ -56,13 +56,13 @@ describe('command definitions', () => {
     const payload = commandPayload();
     const names = payload.map((command) => command.name);
 
-    assert.deepEqual(names, ['setup', 'welcome', 'config', 'rank', 'about']);
+    assert.deepEqual(names, ['setup', 'welcome', 'config', 'rank', 'guilds', 'about']);
     assert.ok(payload.every((command) => command.description.length > 0));
   });
 
   it('keeps the server-shaping commands off limits to ordinary members', () => {
     const payload = commandPayload();
-    for (const name of ['setup', 'welcome', 'config', 'rank']) {
+    for (const name of ['setup', 'welcome', 'config', 'rank', 'guilds']) {
       const command = payload.find((entry) => entry.name === name);
       assert.ok(command.default_member_permissions, `${name} should require a permission`);
     }

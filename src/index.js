@@ -22,7 +22,7 @@ const client = new Client({
   partials: [Partials.Message, Partials.Channel, Partials.Reaction, Partials.User],
 });
 
-const context = { store, log, client };
+const context = { store, log, client, env };
 
 for (const event of events) {
   const handler = (...args) =>

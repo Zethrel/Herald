@@ -1,11 +1,19 @@
 import { ChannelType, EmbedBuilder, Events, PermissionFlagsBits } from 'discord.js';
 
 import { BOT_NAME, BRAND_COLOR, FOOTER } from '../branding.js';
+import { enforceGuildAccess } from '../access/guard.js';
 
 export const name = Events.GuildCreate;
 
-export async function execute(guild, { log }) {
+export async function execute(guild, context) {
+  const { log } = context;
   log.info(`Added to ${guild.name} (${guild.id})`);
+
+  // Anyone holding the invite link can add the bot to a server they own, so
+  // this is the first thing that happens on arrival — before it introduces
+  // itself, and before it does any work.
+  const access = await enforceGuildAccess({ guild, isNew: true, ...context });
+  if (!access.approved) return;
 
   const channel = firstWritableChannel(guild);
   if (!channel) return;

@@ -12,6 +12,14 @@ import { DEFAULT_RANK_KEY, RANK_KEYS, SELF_ASSIGN_RANKS, allChannels, CATEGORIES
 
 export const STORE_VERSION = 1;
 
+// Installation-wide settings. `approvedGuilds` is the allowlist: server id ->
+// { name, approvedBy, approvedAt, note }. Servers approved through the
+// APPROVED_GUILDS environment variable are not written here -- env is the
+// permanent list, this is the one that changes at runtime.
+export function defaultAppConfig() {
+  return { approvedGuilds: {} };
+}
+
 // A fresh server's settings: every slot the blueprint knows about, all unbound.
 // `/setup` fills them in, and `/config set` can rebind any of them by hand for a
 // server that already had its own roles before the bot arrived.
@@ -48,6 +56,9 @@ export function mergeConfig(existing, patch) {
 export function createStore(filePath) {
   /** @type {Map<string, object>} */
   let guilds = new Map();
+  // Settings that belong to the installation rather than to any one server --
+  // which servers are approved to run it at all.
+  let app = defaultAppConfig();
   let loaded = false;
   // Serialises writes: two commands finishing at once must not interleave a
   // read-modify-write and lose one of the two updates.
@@ -60,6 +71,7 @@ export function createStore(filePath) {
       for (const [guildId, config] of Object.entries(raw.guilds ?? {})) {
         guilds.set(guildId, mergeConfig(defaultGuildConfig(), config));
       }
+      app = mergeConfig(defaultAppConfig(), raw.app ?? {});
     } catch (error) {
       if (error.code !== 'ENOENT') throw error;
       // No file yet: first run.
@@ -70,6 +82,7 @@ export function createStore(filePath) {
   async function flush() {
     const payload = {
       version: STORE_VERSION,
+      app,
       guilds: Object.fromEntries(guilds),
     };
     await mkdir(dirname(filePath), { recursive: true });
@@ -105,6 +118,32 @@ export function createStore(filePath) {
     async all() {
       await load();
       return new Map(guilds);
+    },
+
+    async getApp() {
+      await load();
+      return app;
+    },
+
+    async updateApp(patch) {
+      await load();
+      app = mergeConfig(app, patch);
+      writeChain = writeChain.then(flush, flush);
+      await writeChain;
+      return app;
+    },
+
+    /**
+     * Replaces the allowlist wholesale. `updateApp` merges one level deep,
+     * which cannot express a removal -- a patch missing a key leaves that key
+     * exactly where it was.
+     */
+    async setApprovedGuilds(approvedGuilds) {
+      await load();
+      app = { ...app, approvedGuilds };
+      writeChain = writeChain.then(flush, flush);
+      await writeChain;
+      return app;
     },
   };
 }

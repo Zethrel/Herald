@@ -1,10 +1,11 @@
 import * as about from './about.js';
 import * as config from './config.js';
+import * as guilds from './guilds.js';
 import * as rank from './rank.js';
 import * as setup from './setup.js';
 import * as welcome from './welcome.js';
 
-export const commands = [setup, welcome, config, rank, about];
+export const commands = [setup, welcome, config, rank, guilds, about];
 
 /** name -> module, for the interaction handler. */
 export const commandsByName = new Map(commands.map((command) => [command.data.name, command]));

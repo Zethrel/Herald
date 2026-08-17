@@ -1,6 +1,8 @@
 import { Events, MessageFlags } from 'discord.js';
 
+import { BOT_NAME } from '../branding.js';
 import { commandsByName } from '../commands/index.js';
+import { currentApproved } from '../access/guard.js';
 
 export const name = Events.InteractionCreate;
 
@@ -11,6 +13,19 @@ export async function execute(interaction, context) {
   if (!command) {
     context.log.warn(`Unknown command: ${interaction.commandName}`);
     return;
+  }
+
+  // This is what makes UNAPPROVED_SERVER_ACTION=report mean something: the bot
+  // stays in a server it was not approved for, but does nothing there.
+  if (interaction.inGuild()) {
+    const approved = await currentApproved({ store: context.store, env: context.env });
+    if (!approved.has(interaction.guildId)) {
+      context.log.warn(`/${interaction.commandName} blocked in unapproved server ${interaction.guildId}`);
+      return interaction.reply({
+        content: `${BOT_NAME} is not licensed for this server. Ask whoever runs it to approve the server first.`,
+        flags: MessageFlags.Ephemeral,
+      });
+    }
   }
 
   try {

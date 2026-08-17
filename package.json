@@ -12,7 +12,7 @@
     "deploy": "node --env-file-if-exists=.env src/deploy-commands.js",
     "test": "node --test \"test/*.test.js\""
   },
-  "license": "MIT",
+  "license": "UNLICENSED",
   "dependencies": {
     "discord.js": "^14.27.0"
   }

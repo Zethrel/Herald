@@ -99,4 +99,29 @@ describe('createStore', () => {
 
     assert.equal((await createStore(file).get('guild-4')).roles.raider, null);
   });
+
+  it('starts with an empty allowlist', async () => {
+    assert.deepEqual((await createStore(join(dir, 'fresh.json')).getApp()).approvedGuilds, {});
+  });
+
+  it('persists the allowlist alongside the per-server settings', async () => {
+    const store = createStore(file);
+    await store.setApprovedGuilds({ 'guild-1': { note: 'ours' } });
+
+    const reopened = createStore(file);
+    assert.deepEqual((await reopened.getApp()).approvedGuilds['guild-1'], { note: 'ours' });
+    // The per-server settings written earlier are still there.
+    assert.equal((await reopened.get('guild-1')).roles.raider, 'role-raider');
+  });
+
+  it('can remove an entry from the allowlist', async () => {
+    // updateApp merges, so a removal has to go through setApprovedGuilds --
+    // this is the test that keeps that distinction honest.
+    const store = createStore(file);
+    await store.setApprovedGuilds({ a: { note: 'one' }, b: { note: 'two' } });
+    await store.setApprovedGuilds({ a: { note: 'one' } });
+
+    const written = JSON.parse(await readFile(file, 'utf8'));
+    assert.deepEqual(Object.keys(written.app.approvedGuilds), ['a']);
+  });
 });
