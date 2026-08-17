@@ -12,6 +12,8 @@ import { SPECS, SPEC_KEYS, findSpec, specByKey } from '../game/specs.js';
 import { DEFAULT_PER_RAIDER, buildShoppingList, parseRoster } from '../consumables/shopping.js';
 import { formatMoney, priceLines } from '../prices/auctions.js';
 import { gaps, resolveSpecConsumables } from '../consumables/resolve.js';
+import { getRaid, listRaids } from '../raids/repository.js';
+import { rosterForShopping } from '../raids/model.js';
 
 export const data = new SlashCommandBuilder()
   .setName('consumables')
@@ -34,10 +36,13 @@ export const data = new SlashCommandBuilder()
       .setName('shopping')
       .setDescription('Roll a roster up into consumables and the reagents to craft them')
       .addStringOption((option) =>
+        option.setName('roster').setDescription('e.g. 4x fire mage, 2 holy priest, 3 prot warr'),
+      )
+      .addStringOption((option) =>
         option
-          .setName('roster')
-          .setDescription('e.g. 4x fire mage, 2 holy priest, 3 prot warr')
-          .setRequired(true),
+          .setName('raid')
+          .setDescription('Or take the roster from a raid signup')
+          .setAutocomplete(true),
       )
       .addIntegerOption((option) =>
         option.setName('flasks').setDescription(`Flasks per raider (default ${DEFAULT_PER_RAIDER.flask})`).setMinValue(0),
@@ -85,9 +90,24 @@ export const data = new SlashCommandBuilder()
       ),
   );
 
-/** Type-ahead over the spec catalogue, matched the same way the parser matches. */
-export async function autocomplete(interaction) {
-  const typed = interaction.options.getFocused().toLowerCase();
+/** Type-ahead over the spec catalogue, or over this server's raids. */
+export async function autocomplete(interaction, { store }) {
+  const focused = interaction.options.getFocused(true);
+  const typed = (focused.value ?? '').toLowerCase();
+
+  if (focused.name === 'raid') {
+    const raids = await listRaids(store, interaction.guildId);
+    return interaction.respond(
+      raids
+        .filter((raid) => !raid.cancelled && `${raid.id} ${raid.title}`.toLowerCase().includes(typed))
+        .slice(0, 25)
+        .map((raid) => ({
+          name: `${raid.title} — ${Object.values(raid.signups ?? {}).filter((signup) => signup.status === 'yes').length} signed up`.slice(0, 100),
+          value: raid.id,
+        })),
+    );
+  }
+
   const matches = SPECS.filter((spec) => {
     const haystack = [`${spec.name} ${spec.className}`, spec.key, ...spec.aliases].join(' ').toLowerCase();
     return haystack.includes(typed);
@@ -104,7 +124,7 @@ export async function execute(interaction, { store, dataset, prices, log }) {
   const overrides = config.consumables?.overrides ?? {};
 
   if (sub === 'tier') return showTier(interaction, { dataset, overrides });
-  if (sub === 'shopping') return showShopping(interaction, { dataset, overrides, prices });
+  if (sub === 'shopping') return showShopping(interaction, { dataset, overrides, prices, store });
 
   const spec = resolveSpecOption(interaction.options.getString('spec'));
   if (!spec) {
@@ -273,12 +293,44 @@ function showTier(interaction, { dataset, overrides }) {
   return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 }
 
-async function showShopping(interaction, { dataset, overrides, prices }) {
-  const { entries, unknown } = parseRoster(interaction.options.getString('roster'), { findSpec });
+async function showShopping(interaction, { dataset, overrides, prices, store }) {
+  const raidId = interaction.options.getString('raid');
+  const rosterText = interaction.options.getString('roster');
+
+  if (!raidId && !rosterText) {
+    return interaction.reply({
+      content: 'Give me a `roster` to read, or a `raid` to take one from.',
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+
+  let entries = [];
+  let unknown = [];
+  let source = null;
+
+  if (raidId) {
+    const raid = await getRaid(store, interaction.guildId, raidId);
+    if (!raid) {
+      return interaction.reply({ content: 'No such raid.', flags: MessageFlags.Ephemeral });
+    }
+
+    const fromRaid = rosterForShopping(raid);
+    entries = fromRaid.roster;
+    // Signed up but never told the bot what they play: they need consumables
+    // too, and saying so is more use than quietly under-counting.
+    unknown = fromRaid.unknown.map((userId) => `<@${userId}> (no spec set)`);
+    source = raid;
+  } else {
+    const parsed = parseRoster(rosterText, { findSpec });
+    entries = parsed.entries;
+    unknown = parsed.unknown;
+  }
 
   if (entries.length === 0) {
     return interaction.reply({
-      content: `Nothing in that roster matched a spec${unknown.length > 0 ? `: ${unknown.join(', ')}` : ''}. Try "4x fire mage, 2 holy priest".`,
+      content: raidId
+        ? 'Nobody on that raid has signed up with a spec yet.'
+        : `Nothing in that roster matched a spec${unknown.length > 0 ? `: ${unknown.join(', ')}` : ''}. Try "4x fire mage, 2 holy priest".`,
       flags: MessageFlags.Ephemeral,
     });
   }
@@ -295,7 +347,12 @@ async function showShopping(interaction, { dataset, overrides, prices }) {
     .setColor(BRAND_COLOR)
     .setTitle(`Shopping list — ${list.raiders} raider(s)`)
     .setDescription(
-      `Per raider: ${perRaider.flask} flask · ${perRaider.food} food · ${perRaider.potion} potions`,
+      [
+        source ? `From **${source.title}** (\`${source.id}\`)` : null,
+        `Per raider: ${perRaider.flask} flask · ${perRaider.food} food · ${perRaider.potion} potions`,
+      ]
+        .filter(Boolean)
+        .join('\n'),
     )
     .setFooter({ text: FOOTER });
 

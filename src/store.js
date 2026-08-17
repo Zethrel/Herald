@@ -42,6 +42,11 @@ export function defaultGuildConfig() {
     // This server's departures from the tier file: spec key -> { flask, food,
     // potion, source, updatedAt, setBy }.
     consumables: { overrides: {} },
+    // raid id -> raid, and user id -> the spec they last signed up as.
+    raids: {},
+    mains: {},
+    // Used to read the times typed into /raid create. IANA name.
+    timeZone: 'UTC',
   };
 }
 

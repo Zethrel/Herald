@@ -1,6 +1,6 @@
 # Herald
 
-A Discord bot for a World of Warcraft raiding guild. It does three things:
+A Discord bot for a World of Warcraft raiding guild.
 
 1. **Sets the server up** — ranks, categories, channels and their permissions,
    from one command.
@@ -8,6 +8,9 @@ A Discord bot for a World of Warcraft raiding guild. It does three things:
    lands on a server they cannot see.
 3. **Hands out Raider and Social by reaction** on a welcome page, which is the
    only channel an unranked member can see.
+4. **Takes raid signups**, grouped by role, one click per raider.
+5. **Answers what to bring** — flask, food and potion per spec — and turns a
+   roster into a shopping list of reagents, priced off the auction house.
 
 **Members who already have a rank are never touched.** That rule is enforced in
 one place — `src/ranks/membership.js` — and it holds for joins, for the
@@ -68,17 +71,22 @@ needs editing.
 | `/config behaviour ...` | Exclusive ranks on/off, default-rank-removal on/off. |
 | `/config view` | The current configuration. |
 | `/rank backfill [confirm]` | Gives the default rank to members who have **no** rank at all. Reports and does nothing without `confirm:true`. |
+| `/raid create <title> <when>` | Posts a signup for a raid night (Manage Server). |
+| `/raid list` · `/raid roster <raid>` | What is on the calendar, and who is coming. |
+| `/raid close\|cancel\|delete <raid>` | Stop signups, call it off, or remove it (Manage Server). |
+| `/raid timezone <zone>` | The timezone `/raid create` reads times in (Manage Server). |
 | `/consumables spec <spec>` | Flask, food and potion for one spec, with where the answer came from. |
-| `/consumables shopping <roster> [flasks] [food] [potions]` | Rolls a roster up into consumables, crafts and reagents. |
+| `/consumables shopping [roster] [raid] [flasks] [food] [potions]` | Rolls a roster up into consumables, crafts and reagents. |
 | `/consumables tier` | Which tier the data is for, how complete it is, what is still missing. |
 | `/consumables set\|clear` | Override a slot for a spec on this server (Manage Server). |
 | `/guilds list\|approve\|revoke\|leave` | The server allowlist. Bot owners only — see below. |
 | `/about` | What the bot does. |
 
-`/about` and `/consumables` are open to everyone — raiders need to look up their
-own flask. `/consumables set` and `clear` check **Manage Server** in code. Every
-other command requires **Manage Server**, and `/guilds` additionally refuses
-anyone who is not in `OWNER_IDS`.
+`/about`, `/consumables` and `/raid` are open to everyone — raiders need to look
+up their own flask and see who is coming. The subcommands that change things
+(`/consumables set`, `/raid create` and friends) check **Manage Server** in code
+instead. Every other command requires **Manage Server**, and `/guilds`
+additionally refuses anyone who is not in `OWNER_IDS`.
 
 ### Setup is additive, and safe to re-run
 
@@ -94,6 +102,59 @@ it did not make, and it never changes a member's roles.
 
 If your ranks are named something else entirely, bind them by hand with
 `/config rank` and then run setup — it will keep those bindings.
+
+## Raid signups
+
+`/raid create title:"Mythic progression" when:"2026-08-20 20:00"` posts a signup
+in `#raid-signups`:
+
+```
+Mythic progression
+Thursday, 20 August 2026 20:00 · in 3 days
+
+🛡️ Tanks — 2      💚 Healers — 4     ⚔️ Melee — 6      🏹 Ranged — 8
+@ada — Protection  @bo — Holy Priest  @cy — Windwalker  @di — Fire Mage
+…
+
+🕗 Late (1): @ed     🪑 Bench (2): @fi, @gu     ❌ Absent (1): @ha
+
+[ ✅ Signed up ] [ 🕗 Late ] [ ❓ Tentative ] [ 🪑 Bench ] [ ❌ Absent ]
+[ 🔧 Change spec ]
+```
+
+**Signing up is one click** — after the first time. The bot has to know what
+someone plays to put them in a role column and to work out their flask, so the
+first press asks: class, then spec (two menus, because Discord allows 25 options
+per menu and there are 39 specs). That choice is remembered per server, so every
+later raid is a single press. *Change spec* revises it, and picking *Absent* or
+*Tentative* never asks at all.
+
+The roster is grouped the way a raid leader reads it. Late players are listed
+apart from the confirmed roster — they should not be counted on for the first
+pull — but they **do** count for consumables, because they still need a flask.
+Anyone who signed up without a spec is shown under *Spec not set* rather than
+being quietly dropped.
+
+Times are read in the server's timezone (`/raid timezone Europe/Oslo`) and
+posted as Discord timestamps, so every raider sees the raid in their own local
+time — the guild with members in three countries does not have to do arithmetic.
+DST is handled: the same wall-clock time in October and January resolves to
+different instants, and there is a test for it.
+
+Signups are stored per server and every change is applied under a per-guild
+lock, so twenty people pressing the button in the same second all land.
+
+### It feeds the shopping list
+
+```
+/consumables shopping raid:"Mythic progression"
+```
+
+That takes the actual roster — everyone signed up or late, counted by spec — and
+runs it through the shopping list below, prices and all. Nobody types
+`4x fire mage` by hand. People who signed up without setting a spec are named in
+the reply, because a shopping list that silently misses three raiders is worse
+than one that says so.
 
 ## Consumables
 
@@ -285,7 +346,7 @@ It refuses to start without `OWNER_IDS`: a bot that cannot tell anyone about an
 unapproved invite is worse than one that will not boot.
 
 ```sh
-npm test                  # 149 tests, no network needed
+npm test                  # 183 tests, no network needed
 ```
 
 ### Discord Developer Portal
@@ -327,6 +388,7 @@ src/
 ├── game/              the class and specialisation catalogue — data
 ├── sync/              the Blizzard API client, the refresh cadence, the transforms
 ├── prices/            commodity auction pricing, cached per hourly refresh
+├── raids/             raid nights, signups and the roster (model and time are pure)
 ├── plan/              diff the blueprint against a live server (pure)
 ├── apply/             execute the diff
 ├── ranks/             who gets which rank, and when (pure)
