@@ -9,6 +9,7 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
 import { DEFAULT_RANK_KEY, RANK_KEYS, SELF_ASSIGN_RANKS, allChannels, CATEGORIES } from './blueprint.js';
+import { DEFAULT_LEAD_MINUTES } from './raids/reminders.js';
 
 export const STORE_VERSION = 1;
 
@@ -45,6 +46,8 @@ export function defaultGuildConfig() {
     // raid id -> raid, and user id -> the spec they last signed up as.
     raids: {},
     mains: {},
+    // When to ping the roster before a raid, unless a raid says otherwise.
+    reminders: { enabled: true, leadMinutes: DEFAULT_LEAD_MINUTES },
     // Used to read the times typed into /raid create. IANA name.
     timeZone: 'UTC',
   };

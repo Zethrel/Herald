@@ -26,7 +26,15 @@ export function nextRaidId(existing = {}) {
   return `raid-${Math.max(0, ...numbers) + 1}`;
 }
 
-export function createRaid({ id, title, startsAt, description = null, createdBy, timeZone }) {
+export function createRaid({
+  id,
+  title,
+  startsAt,
+  description = null,
+  createdBy,
+  timeZone,
+  leadMinutes = null,
+}) {
   return {
     id,
     title,
@@ -40,6 +48,9 @@ export function createRaid({ id, title, startsAt, description = null, createdBy,
     messageId: null,
     closed: false,
     cancelled: false,
+    // `leadMinutes: null` means "use the server's schedule"; `sent` is what has
+    // already been dealt with, so a restart cannot ping anyone twice.
+    reminders: { leadMinutes, sent: [] },
     /** userId -> { status, specKey, at } */
     signups: {},
   };

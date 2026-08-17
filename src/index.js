@@ -1,6 +1,7 @@
 import { Client, Events, GatewayIntentBits, Partials } from 'discord.js';
 
 import { createLogger } from './logger.js';
+import { createReminderScheduler } from './raids/scheduler.js';
 import { createStore } from './store.js';
 import { events } from './events/index.js';
 import { loadDataset } from './consumables/dataset.js';
@@ -41,7 +42,10 @@ log.info(
     : 'Commodity prices disabled — set BLIZZARD_CLIENT_ID and BLIZZARD_CLIENT_SECRET to turn them on',
 );
 
-const context = { store, log, client, env, dataset, prices };
+// Started once the gateway is ready, not here: it posts messages.
+const reminders = createReminderScheduler({ client, store, env, log });
+
+const context = { store, log, client, env, dataset, prices, reminders };
 
 for (const event of events) {
   const handler = (...args) =>
@@ -59,6 +63,7 @@ client.rest.on('rateLimited', (info) => log.warn(`Rate limited on ${info.route} 
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.on(signal, () => {
     log.info(`${signal} — shutting down`);
+    reminders.stop();
     client.destroy().finally(() => process.exit(0));
   });
 }

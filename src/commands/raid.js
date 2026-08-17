@@ -9,6 +9,7 @@ import {
 import { buildRaidButtons, buildRaidEmbed } from '../raids/render.js';
 import { createRaid, nextRaidId } from '../raids/model.js';
 import { deleteRaid, getRaid, listRaids, saveRaid, updateRaid, upcomingRaids } from '../raids/repository.js';
+import { describeSchedule, leadMinutesFor, parseLeadMinutes } from '../raids/reminders.js';
 import { discordTime, isValidTimeZone, parseWhen } from '../raids/time.js';
 
 export const data = new SlashCommandBuilder()
@@ -34,6 +35,11 @@ export const data = new SlashCommandBuilder()
       )
       .addStringOption((option) =>
         option.setName('timezone').setDescription('IANA name, e.g. Europe/Oslo. Default: the server setting'),
+      )
+      .addStringOption((option) =>
+        option
+          .setName('reminders')
+          .setDescription('When to ping the roster, e.g. "24h, 1h" or "off". Default: the server setting'),
       ),
   )
   .addSubcommand((sub) =>
@@ -79,6 +85,22 @@ export const data = new SlashCommandBuilder()
       .addStringOption((option) =>
         option.setName('zone').setDescription('IANA name, e.g. Europe/Oslo').setRequired(true),
       ),
+  )
+  .addSubcommand((sub) =>
+    sub
+      .setName('reminders')
+      .setDescription('When the roster gets pinged before a raid (Manage Server)')
+      .addStringOption((option) =>
+        option
+          .setName('lead_times')
+          .setDescription('e.g. "24h, 1h", "30m", or "off". Leave empty to see the current setting'),
+      )
+      .addStringOption((option) =>
+        option
+          .setName('raid')
+          .setDescription('Change one raid only, instead of the server default')
+          .setAutocomplete(true),
+      ),
   );
 
 export async function autocomplete(interaction, { store }) {
@@ -114,6 +136,7 @@ export async function execute(interaction, context) {
 
   if (sub === 'create') return create(interaction, context);
   if (sub === 'timezone') return setTimeZone(interaction, context);
+  if (sub === 'reminders') return configureReminders(interaction, context);
   return changeState(interaction, context, sub);
 }
 
@@ -124,6 +147,12 @@ async function create(interaction, { store, log }) {
   const when = parseWhen(interaction.options.getString('when'), timeZone);
   if (when.error) {
     return interaction.reply({ content: when.error, flags: MessageFlags.Ephemeral });
+  }
+
+  const requestedReminders = interaction.options.getString('reminders');
+  const reminders = requestedReminders ? parseLeadMinutes(requestedReminders) : {};
+  if (reminders.error) {
+    return interaction.reply({ content: reminders.error, flags: MessageFlags.Ephemeral });
   }
 
   const channel =
@@ -138,6 +167,7 @@ async function create(interaction, { store, log }) {
     description: interaction.options.getString('description'),
     createdBy: interaction.user.id,
     timeZone,
+    leadMinutes: reminders.leadMinutes ?? null,
   });
 
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
@@ -156,8 +186,67 @@ async function create(interaction, { store, log }) {
   log.info(`${interaction.user.tag} created ${raid.id} in ${interaction.guild.name}`);
 
   return interaction.editReply(
-    `**${raid.title}** is up in <#${channel.id}> for ${discordTime(when.date, 'F')} (\`${raid.id}\`). ${message.url}`,
+    [
+      `**${raid.title}** is up in <#${channel.id}> for ${discordTime(when.date, 'F')} (\`${raid.id}\`).`,
+      `Reminders: **${describeSchedule(leadMinutesFor(raid, config))}**.`,
+      message.url,
+    ].join('\n'),
   );
+}
+
+async function configureReminders(interaction, { store }) {
+  const raidId = interaction.options.getString('raid');
+  const leadTimes = interaction.options.getString('lead_times');
+  const config = await store.get(interaction.guildId);
+
+  if (!leadTimes) {
+    const raid = raidId ? await getRaid(store, interaction.guildId, raidId) : null;
+    if (raidId && !raid) {
+      return interaction.reply({ content: 'No such raid.', flags: MessageFlags.Ephemeral });
+    }
+
+    const schedule = describeSchedule(raid ? leadMinutesFor(raid, config) : config.reminders?.leadMinutes);
+    return interaction.reply({
+      content: raid
+        ? `**${raid.title}** pings its roster **${schedule}**${raid.reminders?.leadMinutes ? '' : ' (the server default)'}.`
+        : `Raids ping their roster **${schedule}** by default.`,
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+
+  const parsed = parseLeadMinutes(leadTimes);
+  if (parsed.error) {
+    return interaction.reply({ content: parsed.error, flags: MessageFlags.Ephemeral });
+  }
+
+  if (raidId) {
+    const { raid, error } = await updateRaid(store, interaction.guildId, raidId, (current) => ({
+      ...current,
+      reminders: {
+        ...(current.reminders ?? {}),
+        leadMinutes: parsed.leadMinutes,
+        // Reminders already sent stay sent: changing the schedule must not
+        // re-ping anyone for a lead time that has passed.
+        sent: current.reminders?.sent ?? [],
+      },
+    }));
+
+    if (error) return interaction.reply({ content: error, flags: MessageFlags.Ephemeral });
+
+    return interaction.reply({
+      content: `**${raid.title}** now pings its roster **${describeSchedule(parsed.leadMinutes)}**.`,
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+
+  await store.update(interaction.guildId, {
+    reminders: { enabled: parsed.leadMinutes.length > 0, leadMinutes: parsed.leadMinutes },
+  });
+
+  return interaction.reply({
+    content: `Raids will ping their roster **${describeSchedule(parsed.leadMinutes)}**. Raids already posted keep whatever they were created with unless you pass \`raid:\`.`,
+    flags: MessageFlags.Ephemeral,
+  });
 }
 
 async function showRoster(interaction, { store }) {

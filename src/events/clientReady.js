@@ -8,7 +8,7 @@ export const name = Events.ClientReady;
 export const once = true;
 
 export async function execute(client, context) {
-  const { store, log, env } = context;
+  const { store, log, env, reminders } = context;
   log.info(`${BOT_NAME} is online as ${client.user.tag}, in ${client.guilds.cache.size} server(s)`);
 
   // The startup sweep. guildCreate covers invites that happen while the bot is
@@ -40,4 +40,8 @@ export async function execute(client, context) {
       log.warn(`Welcome message for ${guild.name} could not be fetched: ${error.message}`);
     }
   }
+
+  // Last, so its first tick runs against an approved, cached client. Anything
+  // that came due while the bot was down is either sent now or closed out.
+  reminders?.start();
 }

@@ -8,7 +8,8 @@ A Discord bot for a World of Warcraft raiding guild.
    lands on a server they cannot see.
 3. **Hands out Raider and Social by reaction** on a welcome page, which is the
    only channel an unranked member can see.
-4. **Takes raid signups**, grouped by role, one click per raider.
+4. **Takes raid signups**, grouped by role, one click per raider, and pings the
+   roster before the raid.
 5. **Answers what to bring** — flask, food and potion per spec — and turns a
    roster into a shopping list of reagents, priced off the auction house.
 
@@ -75,6 +76,7 @@ needs editing.
 | `/raid list` · `/raid roster <raid>` | What is on the calendar, and who is coming. |
 | `/raid close\|cancel\|delete <raid>` | Stop signups, call it off, or remove it (Manage Server). |
 | `/raid timezone <zone>` | The timezone `/raid create` reads times in (Manage Server). |
+| `/raid reminders [lead_times] [raid]` | When the roster gets pinged, for the server or one raid (Manage Server). |
 | `/consumables spec <spec>` | Flask, food and potion for one spec, with where the answer came from. |
 | `/consumables shopping [roster] [raid] [flasks] [food] [potions]` | Rolls a roster up into consumables, crafts and reagents. |
 | `/consumables tier` | Which tier the data is for, how complete it is, what is still missing. |
@@ -143,6 +145,42 @@ different instants, and there is a test for it.
 
 Signups are stored per server and every change is applied under a per-guild
 lock, so twenty people pressing the button in the same second all land.
+
+### Reminders
+
+The roster gets pinged **a day before and an hour before** by default. Change it
+per server or per raid:
+
+```
+/raid reminders lead_times:"24h, 2h, 30m"
+/raid reminders lead_times:"1h" raid:"Mythic progression"
+/raid reminders lead_times:"off"
+/raid create ... reminders:"3h"
+```
+
+The ping names everyone who is signed up or late — being reminded is exactly
+what a late raider needs — and anyone still tentative, whose line asks them to
+confirm rather than telling them to turn up. Bench and absent are left alone.
+Mentions are restricted to that list (`parse: []`), so an `@everyone` typed into
+a raid title cannot ping the server.
+
+Two rules make this safe to run unattended:
+
+- **A reminder is sent at most once, ever.** What has been sent is recorded on
+  the raid before the message goes out, not after. A crash between the two costs
+  one reminder; the other order costs everyone a duplicate ping every minute
+  until it succeeds.
+- **A reminder that is too late is dropped, not sent.** If the bot is offline
+  when one comes due it will still send up to 30 minutes late, but never after
+  the raid has started — a bot that was down for three hours must not wake up
+  and announce a raid that is already pulling. Missed ones are closed out so
+  they cannot fire later.
+
+It runs as a minute ticker rather than a timer per raid: timers do not survive a
+restart, and a raid posted three weeks out would need one held for three weeks.
+Everything a tick needs is in the store, so the process can stop and start
+whenever and the answer is the same. Nothing is sent for a cancelled raid, a
+raid nobody signed up to, or a server that is not on the allowlist.
 
 ### It feeds the shopping list
 
@@ -346,7 +384,7 @@ It refuses to start without `OWNER_IDS`: a bot that cannot tell anyone about an
 unapproved invite is worse than one that will not boot.
 
 ```sh
-npm test                  # 183 tests, no network needed
+npm test                  # 211 tests, no network needed
 ```
 
 ### Discord Developer Portal
@@ -388,7 +426,8 @@ src/
 ├── game/              the class and specialisation catalogue — data
 ├── sync/              the Blizzard API client, the refresh cadence, the transforms
 ├── prices/            commodity auction pricing, cached per hourly refresh
-├── raids/             raid nights, signups and the roster (model and time are pure)
+├── raids/             raid nights, signups, roster and reminders (model, time,
+│                     reminder scheduling all pure)
 ├── plan/              diff the blueprint against a live server (pure)
 ├── apply/             execute the diff
 ├── ranks/             who gets which rank, and when (pure)
