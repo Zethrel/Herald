@@ -33,11 +33,12 @@ all: potion = Light's Potential
 
 crit:         flask = Flask of the Shattered Sun; oil = Thalassian Phoenix Oil
 haste:        flask = Flask of the Blood Knights; oil = Thalassian Phoenix Oil
-mastery:      flask = Flask of the Magisters
-versatility:  flask = Flask of Thalassian Resistance
+mastery:      flask = Flask of the Magisters;      oil = none
+versatility:  flask = Flask of Thalassian Resistance; oil = none
 
-# Thalassian Phoenix Oil is the crit/haste oil, so it sits on those two lines
-# rather than under "all". Add a mastery or versatility oil above if one exists.
+# Thalassian Phoenix Oil covers crit and haste, and no mastery or versatility
+# oil exists yet. "none" says exactly that: those specs are told there is no oil
+# this tier, rather than being shown a blank they have to go and check.
 
 
 # ---- Per role ---------------------------------------------------------------
@@ -56,6 +57,10 @@ tank:   food = -
 # departs from the blocks above:
 #
 #   fire mage: secondary = mastery; potion = Potion of Recklessness
+#
+# A spec that can run either of two stats takes both, and is offered both flasks:
+#
+#   outlaw rogue: secondary = crit|haste
 #
 # The link is that spec's Method page.
 
@@ -106,7 +111,7 @@ tank:   food = -
 
 # Rogue
 # assassination rogue       : secondary = -   # https://www.method.gg/guides/assassination-rogue/stats-races-and-consumables
-# outlaw rogue              : secondary = -   # https://www.method.gg/guides/outlaw-rogue/stats-races-and-consumables
+outlaw rogue                : secondary = crit|haste   # https://www.method.gg/guides/outlaw-rogue/stats-races-and-consumables
 # subtlety rogue            : secondary = -   # https://www.method.gg/guides/subtlety-rogue/stats-races-and-consumables
 
 # Shaman

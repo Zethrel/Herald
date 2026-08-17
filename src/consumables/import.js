@@ -14,7 +14,7 @@
 // and a file with one bad line still contributes every good one.
 
 import { ROLES, STATS, findSpec } from '../game/specs.js';
-import { ALL_KEY, SECONDARY_ALIASES, SECONDARY_STATS, SLOTS } from './dataset.js';
+import { ALL_KEY, NONE, SECONDARY_ALIASES, SECONDARY_STATS, SLOTS } from './dataset.js';
 import { slugify } from '../sync/tierSync.js';
 
 const DEFAULT_KEYS = new Set([
@@ -46,6 +46,14 @@ const SLOT_ALIASES = {
 // flask. Written on a spec line as `secondary = crit`.
 const SECONDARY_FIELD = 'secondary';
 
+/** "A | B" or "A / B": equally acceptable choices, primary first. */
+function splitAlternatives(value) {
+  return value
+    .split(/\s*[|]\s*|\s+\/\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
 function parseAssignments(text, lineNumber, errors) {
   const assignments = {};
 
@@ -67,16 +75,31 @@ function parseAssignments(text, lineNumber, errors) {
 
     if (field === SECONDARY_FIELD) {
       if (!value0 || value0 === '-') continue;
-      const secondary = SECONDARY_ALIASES[value0.toLowerCase()];
-      if (!secondary) {
+
+      // "crit|haste" -- a spec that stacks either, which some genuinely do.
+      const wanted = splitAlternatives(value0);
+      const stats = [];
+      let bad = null;
+
+      for (const entry of wanted) {
+        const secondary = SECONDARY_ALIASES[entry.toLowerCase()];
+        if (!secondary) {
+          bad = entry;
+          break;
+        }
+        if (!stats.includes(secondary)) stats.push(secondary);
+      }
+
+      if (bad) {
         errors.push({
           line: lineNumber,
           text: trimmed,
-          reason: `unknown secondary "${value0}" — use ${SECONDARY_STATS.join(', ')}`,
+          reason: `unknown secondary "${bad}" — use ${SECONDARY_STATS.join(', ')}`,
         });
         continue;
       }
-      assignments[SECONDARY_FIELD] = secondary;
+
+      assignments[SECONDARY_FIELD] = stats.length === 1 ? stats[0] : stats;
       continue;
     }
 
@@ -90,10 +113,17 @@ function parseAssignments(text, lineNumber, errors) {
       continue;
     }
 
-    const value = match[2].trim();
-    if (!value || value === '-') continue; // A blank in the template: not filled in yet.
+    if (!value0 || value0 === '-') continue; // A blank in the template: not filled in yet.
 
-    assignments[slot] = value;
+    // "none" is an answer: there is no such consumable this tier. Distinct from
+    // a blank, and rendered as such.
+    if (value0.toLowerCase() === NONE) {
+      assignments[slot] = NONE;
+      continue;
+    }
+
+    const alternatives = splitAlternatives(value0);
+    assignments[slot] = alternatives.length === 1 ? alternatives[0] : alternatives;
   }
 
   return assignments;
@@ -122,8 +152,15 @@ export function parseTierText(text) {
     const entry = target[key] ?? {};
     for (const [slot, name] of Object.entries(assignments)) {
       // A stat name, not an item: it selects a default block rather than
-      // naming something anyone puts in their bags.
-      entry[slot] = slot === SECONDARY_FIELD ? name : remember(name);
+      // naming something anyone puts in their bags. `none` is not an item
+      // either -- it is the statement that there is not one.
+      if (slot === SECONDARY_FIELD || name === NONE) {
+        entry[slot] = name;
+      } else if (Array.isArray(name)) {
+        entry[slot] = name.map(remember);
+      } else {
+        entry[slot] = remember(name);
+      }
     }
     target[key] = entry;
   };

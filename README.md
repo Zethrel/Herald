@@ -323,9 +323,14 @@ all: potion = Light's Potential
 
 crit:         flask = Flask of the Shattered Sun; oil = Thalassian Phoenix Oil
 haste:        flask = Flask of the Blood Knights; oil = Thalassian Phoenix Oil
-mastery:      flask = Flask of the Magisters
-versatility:  flask = Flask of Thalassian Resistance
+mastery:      flask = Flask of the Magisters;      oil = none
+versatility:  flask = Flask of Thalassian Resistance; oil = none
 ```
+
+Thalassian Phoenix Oil covers crit and haste, and no mastery or versatility oil
+exists — `none` says exactly that. It is a different answer from a blank: a spec
+is told *none this tier* rather than being shown an empty slot it has to go and
+check.
 
 Below that is every spec, commented out, each with a link to its Method page.
 Uncomment the ones you raid with and give each its stat priority — that one word
@@ -333,8 +338,14 @@ is what selects its flask and oil:
 
 ```
 fire mage:          secondary = mastery
+outlaw rogue:       secondary = crit|haste
 protection warrior: secondary = versatility; potion = Potion of Recklessness
 ```
+
+A spec that can run either stat takes both, and is offered both flasks — `A | B`
+works in any slot for the same reason. Alternatives are equally acceptable, not
+a fallback, so `/consumables spec` renders them as *"X or Y"*; the shopping list
+buys only the first, since buying both would double the order.
 
 Add item slots only where a spec departs from the blocks above. Item names may
 contain commas — assignments are separated by semicolons for exactly that
@@ -513,7 +524,7 @@ It refuses to start without `OWNER_IDS`: a bot that cannot tell anyone about an
 unapproved invite is worse than one that will not boot.
 
 ```sh
-npm test                  # 287 tests, no network needed
+npm test                  # 297 tests, no network needed
 ```
 
 ### Discord Developer Portal

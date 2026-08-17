@@ -37,6 +37,17 @@ export const SECONDARY_ALIASES = {
 /** The default block that applies to every spec, whatever it plays. */
 export const ALL_KEY = 'all';
 
+/**
+ * An explicit "there isn't one this tier", as opposed to "nobody has filled
+ * this in". A mastery spec has no weapon oil because none exists, and saying so
+ * is worth more than an empty slot a raider has to go and check.
+ */
+export const NONE = 'none';
+
+export function isNone(reference) {
+  return reference === NONE;
+}
+
 export function emptyDataset() {
   return {
     schema: 1,
@@ -114,6 +125,33 @@ export function resolveItem(dataset, reference) {
     itemId: item.itemId ?? null,
     wowhead: item.wowhead ?? null,
   };
+}
+
+/**
+ * A slot may hold one item or several acceptable ones -- a guide that says
+ * "crit or haste flask" is stating a real fact about the spec, not hedging, and
+ * flattening it to one would lose it. The first is the primary; the rest are
+ * alternatives.
+ *
+ * @returns {Array<{slug: string|null, name: string, itemId: number|null, wowhead: string|null}>}
+ */
+export function resolveItemList(dataset, reference) {
+  if (reference == null || isNone(reference)) return [];
+
+  const references = Array.isArray(reference) ? reference : [reference];
+  const seen = new Set();
+  const items = [];
+
+  for (const entry of references) {
+    const item = resolveItem(dataset, entry);
+    if (!item) continue;
+    const key = item.slug ?? `name:${item.name.toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    items.push(item);
+  }
+
+  return items;
 }
 
 /** How many of the catalogue's specs have at least one slot filled. */

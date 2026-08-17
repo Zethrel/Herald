@@ -232,3 +232,36 @@ describe('the corrected consumable model', () => {
     assert.equal(parseTierText('all: weapon oil = Some Oil').defaults.all.oil, 'some-oil');
   });
 });
+
+describe('alternatives and "none" in the text format', () => {
+  it('reads two secondaries as a list', () => {
+    const parsed = parseTierText('outlaw rogue: secondary = crit|haste');
+
+    assert.deepEqual(parsed.specs['rogue.outlaw'].secondary, ['crit', 'haste']);
+  });
+
+  it('keeps a single secondary a plain string', () => {
+    assert.equal(parseTierText('fire mage: secondary = mastery').specs['mage.fire'].secondary, 'mastery');
+  });
+
+  it('reads alternative items, primary first', () => {
+    const parsed = parseTierText('crit: flask = Flask A | Flask B');
+
+    assert.deepEqual(parsed.defaults.crit.flask, ['flask-a', 'flask-b']);
+    assert.equal(parsed.items['flask-b'].name, 'Flask B');
+  });
+
+  it('records "none" as an answer rather than an item', () => {
+    const parsed = parseTierText('mastery: oil = none');
+
+    assert.equal(parsed.defaults.mastery.oil, 'none');
+    // It must never reach the shopping list as something to buy.
+    assert.deepEqual(parsed.items, {});
+  });
+
+  it('does not split an item name that merely contains a slash', () => {
+    const parsed = parseTierText('all: food = Feast of Meat/Fish');
+
+    assert.equal(parsed.defaults.all.food, 'feast-of-meat-fish');
+  });
+});

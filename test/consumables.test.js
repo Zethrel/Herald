@@ -327,7 +327,7 @@ describe('flasks follow the secondary stat', () => {
   it('picks the flask from the declared secondary', () => {
     const fire = resolveSpecConsumables({ spec: specByKey('mage.fire'), dataset: tier });
 
-    assert.equal(fire.secondary, 'mastery');
+    assert.deepEqual(fire.secondary, ['mastery']);
     assert.equal(fire.slots.flask.item.name, 'Flask of the Magisters');
     assert.equal(fire.slots.flask.via, 'default:mastery');
   });
@@ -337,8 +337,10 @@ describe('flasks follow the secondary stat', () => {
     // stat priority on their behalf.
     const rogue = resolveSpecConsumables({ spec: specByKey('rogue.outlaw'), dataset: tier });
 
-    assert.equal(rogue.secondary, null);
+    assert.deepEqual(rogue.secondary, []);
     assert.equal(rogue.slots.flask.item, null);
+    // Not "there isn't one" -- just unanswered.
+    assert.equal(rogue.slots.flask.none, false);
   });
 
   it('takes the weapon oil from the same block, and leaves it empty where there is none', () => {
@@ -374,7 +376,82 @@ describe('flasks follow the secondary stat', () => {
       overrides: { 'mage.fire': { secondary: 'crit' } },
     });
 
-    assert.equal(resolved.secondary, 'crit');
+    assert.deepEqual(resolved.secondary, ['crit']);
     assert.equal(resolved.slots.flask.item.name, 'Flask of the Shattered Sun');
+  });
+});
+
+describe('alternatives, and an explicit "none"', () => {
+  const tier = normalizeDataset({
+    items: {
+      'flask-crit': { name: 'Flask of the Shattered Sun' },
+      'flask-haste': { name: 'Flask of the Blood Knights' },
+      'flask-mastery': { name: 'Flask of the Magisters' },
+      'phoenix-oil': { name: 'Thalassian Phoenix Oil' },
+    },
+    defaults: {
+      crit: { flask: 'flask-crit', oil: 'phoenix-oil' },
+      haste: { flask: 'flask-haste', oil: 'phoenix-oil' },
+      // No mastery oil exists this tier, and saying so is not the same as
+      // leaving it blank.
+      mastery: { flask: 'flask-mastery', oil: 'none' },
+    },
+    specs: {
+      'rogue.outlaw': { secondary: ['crit', 'haste'] },
+      'mage.fire': { secondary: 'mastery' },
+    },
+  });
+
+  it('offers both flasks to a spec that stacks either stat', () => {
+    const outlaw = resolveSpecConsumables({ spec: specByKey('rogue.outlaw'), dataset: tier });
+
+    assert.deepEqual(outlaw.secondary, ['crit', 'haste']);
+    assert.equal(outlaw.slots.flask.item.name, 'Flask of the Shattered Sun');
+    assert.deepEqual(
+      outlaw.slots.flask.alternatives.map((entry) => entry.name),
+      ['Flask of the Blood Knights'],
+    );
+    assert.equal(outlaw.slots.flask.via, 'default:crit/haste');
+  });
+
+  it('does not double up an item both stats share', () => {
+    const outlaw = resolveSpecConsumables({ spec: specByKey('rogue.outlaw'), dataset: tier });
+
+    assert.equal(outlaw.slots.oil.item.name, 'Thalassian Phoenix Oil');
+    assert.deepEqual(outlaw.slots.oil.alternatives, []);
+  });
+
+  it('distinguishes "there is none" from "nobody filled it in"', () => {
+    const fire = resolveSpecConsumables({ spec: specByKey('mage.fire'), dataset: tier });
+    assert.equal(fire.slots.oil.none, true);
+    assert.equal(fire.slots.oil.item, null);
+
+    // Food was never mentioned by anyone: unanswered, not absent.
+    assert.equal(fire.slots.food.none, false);
+    assert.equal(fire.slots.food.item, null);
+  });
+
+  it('lets a real item beat a "none" from the other stat block', () => {
+    const mixed = normalizeDataset({
+      ...tier,
+      specs: { 'rogue.outlaw': { secondary: ['mastery', 'crit'] } },
+    });
+
+    const outlaw = resolveSpecConsumables({ spec: specByKey('rogue.outlaw'), dataset: mixed });
+    assert.equal(outlaw.slots.oil.item.name, 'Thalassian Phoenix Oil');
+    assert.equal(outlaw.slots.oil.none, false);
+  });
+
+  it('buys only the primary, so a shopping list is not doubled', () => {
+    // Both flasks are acceptable; buying both would be wrong.
+    const list = buildShoppingList({
+      roster: [{ spec: specByKey('rogue.outlaw'), count: 4 }],
+      dataset: tier,
+      perRaider: { flask: 2, food: 0, potion: 0, oil: 0 },
+    });
+
+    assert.equal(list.consumables.length, 1);
+    assert.equal(list.consumables[0].name, 'Flask of the Shattered Sun');
+    assert.equal(list.consumables[0].quantity, 8);
   });
 });

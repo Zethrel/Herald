@@ -5,7 +5,7 @@
 // "intellect casters use X" still answers for all nineteen intellect specs,
 // while a guild that disagrees about one spec can override just that one.
 
-import { ALL_KEY, SLOTS, resolveItem } from './dataset.js';
+import { ALL_KEY, NONE, SLOTS, isNone, resolveItemList } from './dataset.js';
 import { consensusFor, reportedSecondary } from '../sources/compare.js';
 
 /**
@@ -41,9 +41,13 @@ export function resolveSpecConsumables({ spec, dataset, overrides = {}, reports 
 
   // Which secondary this spec is stacking, decided the same way as everything
   // else: the guild first, then the tier file, then what the guides said.
-  const secondary =
-    guild.secondary ?? specEntry.secondary ?? reportedSecondary({ dataset, spec, reports }) ?? null;
-  const secondaryDefault = secondary ? (dataset.defaults?.[secondary] ?? {}) : {};
+  // A spec may stack either of two secondaries -- Method says as much for some
+  // -- so this is a list, and its flask is whatever those blocks offer between
+  // them.
+  const secondary = asList(
+    guild.secondary ?? specEntry.secondary ?? reportedSecondary({ dataset, spec, reports }) ?? null,
+  );
+  const secondaryDefault = mergeBlocks(secondary.map((stat) => dataset.defaults?.[stat] ?? {}));
 
   const slots = {};
   for (const slot of SLOTS) {
@@ -51,25 +55,37 @@ export function resolveSpecConsumables({ spec, dataset, overrides = {}, reports 
       ['guild', guild[slot]],
       ['spec', specEntry[slot]],
       ['sources', consensus[slot]?.item ?? null],
-      [secondary ? `default:${secondary}` : 'default:secondary', secondaryDefault[slot]],
+      [secondary.length > 0 ? `default:${secondary.join('/')}` : 'default:secondary', secondaryDefault[slot]],
       [`default:${spec.role}`, roleDefault[slot]],
       [`default:${spec.stat}`, statDefault[slot]],
       ['default:all', allDefault[slot]],
     ];
 
-    const hit = candidates.find(([, reference]) => Boolean(reference));
+    const hit = candidates.find(([, reference]) => hasAnswer(reference));
+
+    if (hit && isNone(hit[1])) {
+      // Answered, and the answer is that there is not one. Different from an
+      // empty slot, and rendered differently.
+      slots[slot] = { via: hit[0], item: null, alternatives: [], none: true };
+      continue;
+    }
+
+    const items = hit ? resolveItemList(dataset, hit[1]) : [];
 
     slots[slot] = hit
       ? {
           via: hit[0],
-          item: resolveItem(dataset, hit[1]),
+          item: items[0] ?? null,
+          // Equally acceptable choices, in the order the guide gave them.
+          alternatives: items.slice(1),
+          none: false,
           // Which guides, and whether they were unanimous, so the reply can say
           // "Icy Veins and Method" rather than an anonymous "sources".
           ...(hit[0] === 'sources'
             ? { agreement: consensus[slot].agreement, sourceIds: consensus[slot].sourceIds }
             : {}),
         }
-      : { via: null, item: null };
+      : { via: null, item: null, alternatives: [], none: false };
   }
 
   return {
@@ -81,6 +97,46 @@ export function resolveSpecConsumables({ spec, dataset, overrides = {}, reports 
     updatedAt: guild.updatedAt ?? specEntry.updatedAt ?? dataset.updatedAt ?? null,
     complete: SLOTS.every((slot) => slots[slot].item),
   };
+}
+
+function asList(value) {
+  if (value == null) return [];
+  return Array.isArray(value) ? value.filter(Boolean) : [value];
+}
+
+function hasAnswer(reference) {
+  if (reference == null || reference === '') return false;
+  if (Array.isArray(reference)) return reference.length > 0;
+  return true;
+}
+
+/**
+ * Combine several default blocks into one, keeping every acceptable item.
+ * `none` only survives when nothing else answered -- an actual item always
+ * beats "there isn't one".
+ */
+function mergeBlocks(blocks) {
+  const merged = {};
+
+  for (const slot of SLOTS) {
+    const values = [];
+    let sawNone = false;
+
+    for (const block of blocks) {
+      const value = block?.[slot];
+      if (!hasAnswer(value)) continue;
+      if (isNone(value)) {
+        sawNone = true;
+        continue;
+      }
+      values.push(...(Array.isArray(value) ? value : [value]));
+    }
+
+    if (values.length > 0) merged[slot] = [...new Set(values)];
+    else if (sawNone) merged[slot] = NONE;
+  }
+
+  return merged;
 }
 
 /** The same, for every spec in the catalogue. Used by the shopping list. */

@@ -270,7 +270,11 @@ function resolveSpecOption(value) {
 
 function renderSlots(resolved) {
   return SLOTS.map((slot) => {
-    const { item, via } = resolved.slots[slot];
+    const { item, via, alternatives, none } = resolved.slots[slot];
+
+    // Three different states, and conflating them is how a raider ends up
+    // hunting for something that does not exist.
+    if (none) return `**${SLOT_LABELS[slot]}** — _none this tier_`;
     if (!item) return `**${SLOT_LABELS[slot]}** — _not set for this tier_`;
 
     const link = item.itemId
@@ -288,7 +292,11 @@ function renderSlots(resolved) {
             resolved.slots[slot].agreement === 'majority' ? ', majority' : ''
           })_`
         : '';
-    return `**${SLOT_LABELS[slot]}** — ${item.name}${link}${note}${mine}${guides}`;
+    // "or" rather than a second line: they are equally fine, not a fallback.
+    const others =
+      alternatives?.length > 0 ? ` _or ${alternatives.map((entry) => entry.name).join(', ')}_` : '';
+
+    return `**${SLOT_LABELS[slot]}** — ${item.name}${link}${others}${note}${mine}${guides}`;
   }).join('\n');
 }
 
@@ -417,7 +425,15 @@ function showSpec(interaction, { spec, dataset, overrides, reports }) {
   const embed = new EmbedBuilder()
     .setColor(BRAND_COLOR)
     .setTitle(`${spec.name} ${spec.className}`)
-    .setDescription(renderSlots(resolved))
+    .setDescription(
+      [
+        resolved.secondary.length > 0
+          ? `_Stacking ${resolved.secondary.join(' or ')}_`
+          : '_No stat priority recorded — that is what picks the flask._',
+        '',
+        renderSlots(resolved),
+      ].join('\n'),
+    )
     .addFields({
       name: 'Tier',
       value: `${tierLine(dataset)}${resolved.source ? `\nSource: ${resolved.source}` : ''}`,
