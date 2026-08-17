@@ -8,12 +8,9 @@
   "updatedAt": null,
   "staleAfterDays": 90,
   "sources": [],
-  "note": "Nothing is filled in yet. Herald refuses to invent consumables: an empty slot renders as 'not set for this tier' rather than a guess. See example.json for the shape. Fill in `items` (a name and \"craft\": true is enough) plus `defaults`/`specs` from a source you trust, put the link in `sources`, then run `npm run sync-tier` to have Blizzard's API fill in the item ids, craft yields and reagents.",
-
+  "note": "Nothing is filled in yet. Herald refuses to invent consumables: an empty slot renders as 'not set for this tier' rather than a guess. See example.json for the shape. Fill in `items` (a name and \"craft\": true is enough) plus `defaults`/`specs` from a source you trust, put the link in `sources`, then run `npm run sync-tier` to have Blizzard's API fill in the item ids, craft yields and reagents. `reports` is what each guide says, kept per source so /consumables compare can show them side by side; Herald uses their consensus only where they agree.",
   "items": {},
-
   "recipes": {},
-
   "defaults": {
     "intellect": {},
     "agility": {},
@@ -21,6 +18,6 @@
     "healer": {},
     "tank": {}
   },
-
-  "specs": {}
+  "specs": {},
+  "reports": {}
 }

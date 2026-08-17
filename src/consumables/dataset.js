@@ -28,6 +28,8 @@ export function emptyDataset() {
     recipes: {},
     defaults: {},
     specs: {},
+    // What each guide says, per source: see src/sources/compare.js.
+    reports: {},
   };
 }
 
@@ -46,6 +48,7 @@ export function normalizeDataset(raw) {
     recipes: raw?.recipes ?? {},
     defaults: raw?.defaults ?? {},
     specs: raw?.specs ?? {},
+    reports: raw?.reports ?? {},
     sources: raw?.sources ?? [],
   };
 }

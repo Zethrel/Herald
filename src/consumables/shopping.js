@@ -53,13 +53,19 @@ export const DEFAULT_PER_RAIDER = { flask: 1, food: 2, potion: 8 };
  * @param {object} [input.overrides] this server's overrides
  * @param {{flask: number, food: number, potion: number}} [input.perRaider]
  */
-export function buildShoppingList({ roster, dataset, overrides = {}, perRaider = DEFAULT_PER_RAIDER }) {
+export function buildShoppingList({
+  roster,
+  dataset,
+  overrides = {},
+  perRaider = DEFAULT_PER_RAIDER,
+  reports = null,
+}) {
   /** @type {Map<string, {slug: string|null, name: string, quantity: number, slots: Set<string>}>} */
   const wanted = new Map();
   const missingSlots = [];
 
   for (const { spec, count } of roster) {
-    const resolved = resolveSpecConsumables({ spec, dataset, overrides });
+    const resolved = resolveSpecConsumables({ spec, dataset, overrides, reports });
     const empty = [];
 
     for (const slot of SLOTS) {

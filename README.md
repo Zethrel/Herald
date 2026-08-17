@@ -80,6 +80,8 @@ needs editing.
 | `/consumables spec <spec>` | Flask, food and potion for one spec, with where the answer came from. |
 | `/consumables shopping [roster] [raid] [flasks] [food] [potions]` | Rolls a roster up into consumables, crafts and reagents. |
 | `/consumables tier` | Which tier the data is for, how complete it is, what is still missing. |
+| `/consumables compare [spec]` | What Icy Veins, Wowhead and Method each say — or every spec they disagree on. |
+| `/consumables report <source> <spec> <slot> <item>` | Record what one guide says (Manage Server). |
 | `/consumables set\|clear` | Override a slot for a spec on this server (Manage Server). |
 | `/guilds list\|approve\|revoke\|leave` | The server allowlist. Bot owners only — see below. |
 | `/about` | What the bot does. |
@@ -240,16 +242,17 @@ The file has four parts:
 | Key | What it holds |
 | --- | --- |
 | `items` | slug → name, item id (drives the Wowhead links) |
+| `reports` | what each guide says, per source — see *Comparing the guides* |
 | `recipes` | slug → profession, yield, reagents. This is what makes the shopping list possible |
 | `defaults` | per primary stat (`intellect`, `agility`, `strength`) and per role (`healer`, `tank`) |
 | `specs` | per spec, when a spec departs from its stat's default |
 
-Answers resolve in that order, most specific first: **this server's override →
-the spec's own entry → its primary stat → its role.** So one `intellect` entry
-answers for all nineteen intellect specs, and you only write a spec entry where
-a spec actually differs. `/consumables spec` says which of those a given answer
-came from, so a raider can see when they are reading a class-wide default rather
-than something set for them.
+Answers resolve most specific first: **this server's override → the spec's own
+entry → what the guides agree on → its primary stat → its role.** So one
+`intellect` entry answers for all nineteen intellect specs, and you only write a
+spec entry where a spec actually differs. `/consumables spec` says which of
+those a given answer came from, so a raider can see when they are reading a
+class-wide default rather than something set for them.
 
 Provenance is part of the format, not decoration. `updatedAt` and `sources`
 drive a staleness warning after `staleAfterDays` (90 by default), and undated
@@ -260,6 +263,59 @@ lists what is still unanswered.
 Officers can also fix one spec without touching the file: `/consumables set spec:fire mage
 slot:flask item:... source:...` overrides it for that server only, and
 `/consumables clear` puts it back.
+
+### Comparing the guides
+
+Herald tracks what [Icy Veins](https://www.icy-veins.com/),
+[Wowhead](https://www.wowhead.com/) and [Method](https://www.method.gg/) each
+recommend, per spec, per slot — plus a fourth "source" for the guild's own call,
+so a decision that departs from all three is visible rather than silent.
+
+```
+/consumables compare spec:fire mage
+  Flask     — ➗ majority
+    Icy Veins: Flask of <x> (source) · 3 days ago
+    Wowhead:   Flask of <x> (source) · 3 days ago
+    Method:    Flask of <y> (source) · 3 days ago
+  Food buff — ⚠️ they disagree
+    …
+
+/consumables compare          → every spec the guides split on
+```
+
+**Where they agree, Herald uses it** — it sits above the generic stat defaults
+in the chain, since a guide that looked at this exact spec beats "all intellect
+casters use X", and below anything a person wrote deliberately.
+
+**Where they disagree, Herald picks nothing** and falls through to the tier
+file. A split is the information: it means the choice is close, or the tier
+moved, or one guide is stale. Two against two is not a recommendation, and
+resolving it into a single confident answer would be a coin toss dressed up as
+advice. A clear majority is used but labelled as one.
+
+Every quoted line keeps the source's name, the page URL and when it was read.
+These are other people's editorial judgements; Herald repeats them with
+attribution, it does not absorb them.
+
+### Getting the guides in
+
+`/consumables report source:icy-veins spec:fire mage slot:flask item:"…" url:…`
+records one guide's answer for one spec, on one server. That works today and
+needs nothing external.
+
+For anything bulk, fill the `reports` section of the tier file — the shape is in
+[`tiers/example.json`](tiers/example.json), which shows three guides on one
+spec, two agreeing and one not.
+
+**There is no scraper, deliberately.** Automating this needs per-site HTML
+selectors, and those can only be written against the real pages and re-verified
+every time a site reworks its guide templates — which all three do between
+tiers. Selectors written blind would look right, break silently mid-tier, and be
+discovered on raid night, which is the same failure mode this whole file exists
+to avoid. If you want it automated, the honest path is a small fetcher per site
+written and checked against live markup, run on a schedule, writing into
+`reports` exactly as the manual command does — everything downstream of that
+point already works.
 
 The file is read once at startup, so editing it means a restart — the same cost
 as editing `.env`. [`tiers/example.json`](tiers/example.json) shows the shape
@@ -393,7 +449,7 @@ It refuses to start without `OWNER_IDS`: a bot that cannot tell anyone about an
 unapproved invite is worse than one that will not boot.
 
 ```sh
-npm test                  # 216 tests, no network needed
+npm test                  # 242 tests, no network needed
 ```
 
 ### Discord Developer Portal
@@ -433,6 +489,7 @@ src/
 ├── access/            which servers may run the bot, and telling you when one may not
 ├── consumables/       the tier file, spec resolution and the shopping list (pure)
 ├── game/              the class and specialisation catalogue — data
+├── sources/           what each guide recommends, and how they compare (pure)
 ├── sync/              the Blizzard API client, the refresh cadence, the transforms
 ├── prices/            commodity auction pricing, cached per hourly refresh
 ├── raids/             raid nights, signups, roster and reminders (model, time,

@@ -14,6 +14,8 @@ import { formatMoney, priceLines } from '../prices/auctions.js';
 import { gaps, resolveSpecConsumables } from '../consumables/resolve.js';
 import { getRaid, listRaids } from '../raids/repository.js';
 import { rosterForShopping } from '../raids/model.js';
+import { SOURCES, sourceName } from '../sources/registry.js';
+import { compareSpec, disagreements, mergeReports } from '../sources/compare.js';
 
 export const data = new SlashCommandBuilder()
   .setName('consumables')
@@ -59,6 +61,45 @@ export const data = new SlashCommandBuilder()
   )
   .addSubcommand((sub) =>
     sub.setName('tier').setDescription('Which tier the data is for, how complete it is, and where it came from'),
+  )
+  .addSubcommand((sub) =>
+    sub
+      .setName('compare')
+      .setDescription('What each guide says, side by side')
+      .addStringOption((option) =>
+        option
+          .setName('spec')
+          .setDescription('Leave empty to list the specs the guides disagree on')
+          .setAutocomplete(true),
+      ),
+  )
+  .addSubcommand((sub) =>
+    sub
+      .setName('report')
+      .setDescription("Record what one guide says for a spec (Manage Server)")
+      .addStringOption((option) =>
+        option
+          .setName('source')
+          .setDescription('Which guide')
+          .setRequired(true)
+          .addChoices(...SOURCES.map((source) => ({ name: source.name, value: source.id }))),
+      )
+      .addStringOption((option) =>
+        option.setName('spec').setDescription('Which spec').setRequired(true).setAutocomplete(true),
+      )
+      .addStringOption((option) =>
+        option
+          .setName('slot')
+          .setDescription('Which consumable')
+          .setRequired(true)
+          .addChoices(...SLOTS.map((slot) => ({ name: SLOT_LABELS[slot], value: slot }))),
+      )
+      .addStringOption((option) =>
+        option.setName('item').setDescription('What that guide recommends').setRequired(true),
+      )
+      .addStringOption((option) =>
+        option.setName('url').setDescription('The page you read it on — kept as the attribution'),
+      ),
   )
   .addSubcommand((sub) =>
     sub
@@ -122,9 +163,11 @@ export async function execute(interaction, { store, dataset, prices, log }) {
   const sub = interaction.options.getSubcommand();
   const config = await store.get(interaction.guildId);
   const overrides = config.consumables?.overrides ?? {};
+  const reports = mergeReports(dataset.reports, config.consumables?.reports);
 
-  if (sub === 'tier') return showTier(interaction, { dataset, overrides });
-  if (sub === 'shopping') return showShopping(interaction, { dataset, overrides, prices, store });
+  if (sub === 'tier') return showTier(interaction, { dataset, overrides, reports });
+  if (sub === 'shopping') return showShopping(interaction, { dataset, overrides, prices, store, reports });
+  if (sub === 'compare') return showCompare(interaction, { dataset, reports });
 
   const spec = resolveSpecOption(interaction.options.getString('spec'));
   if (!spec) {
@@ -135,12 +178,47 @@ export async function execute(interaction, { store, dataset, prices, log }) {
     });
   }
 
-  if (sub === 'spec') return showSpec(interaction, { spec, dataset, overrides });
+  if (sub === 'spec') return showSpec(interaction, { spec, dataset, overrides, reports });
 
-  // set / clear both change the server's data, so they need Manage Server.
+  // set, clear and report all change the server's data, so they need Manage Server.
   if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
     return interaction.reply({
       content: 'Changing what the raid is told to bring is a Manage Server job.',
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+
+  if (sub === 'report') {
+    const sourceId = interaction.options.getString('source');
+    const slot = interaction.options.getString('slot');
+    const item = interaction.options.getString('item').trim();
+    const url = interaction.options.getString('url');
+
+    const existing = config.consumables?.reports ?? {};
+    const forSource = existing[sourceId] ?? { specs: {} };
+
+    const next = {
+      ...existing,
+      [sourceId]: {
+        ...forSource,
+        specs: {
+          ...(forSource.specs ?? {}),
+          [spec.key]: {
+            ...(forSource.specs?.[spec.key] ?? {}),
+            [slot]: item,
+            url: url ?? forSource.specs?.[spec.key]?.url ?? null,
+            fetchedAt: new Date().toISOString(),
+            recordedBy: interaction.user.id,
+          },
+        },
+      },
+    };
+
+    await store.update(interaction.guildId, { consumables: { reports: next } });
+    log.info(`${interaction.user.tag} recorded ${sourceId} ${spec.key}.${slot} = ${item}`);
+
+    return interaction.reply({
+      content: `Recorded: **${sourceName(sourceId)}** says **${spec.name} ${spec.className}** takes **${item}** for ${SLOT_LABELS[slot].toLowerCase()}. See how it compares with \`/consumables compare spec:${spec.name} ${spec.className}\`.`,
       flags: MessageFlags.Ephemeral,
     });
   }
@@ -201,7 +279,15 @@ function renderSlots(resolved) {
     // because that is exactly the case where a raider should double-check.
     const note = via && via.startsWith('default:') ? ` _(${via.replace('default:', '')} default)_` : '';
     const mine = via === 'guild' ? ' _(this server)_' : '';
-    return `**${SLOT_LABELS[slot]}** — ${item.name}${link}${note}${mine}`;
+    // Naming the guides matters more than saying "sources": a raider can go and
+    // read them, and can see when only one of the three has an opinion.
+    const guides =
+      via === 'sources'
+        ? ` _(${resolved.slots[slot].sourceIds.map(sourceName).join(', ')}${
+            resolved.slots[slot].agreement === 'majority' ? ', majority' : ''
+          })_`
+        : '';
+    return `**${SLOT_LABELS[slot]}** — ${item.name}${link}${note}${mine}${guides}`;
   }).join('\n');
 }
 
@@ -218,8 +304,97 @@ function staleWarning(dataset) {
     : '⚠️ Nothing here has been dated, so treat it as unverified.';
 }
 
-function showSpec(interaction, { spec, dataset, overrides }) {
-  const resolved = resolveSpecConsumables({ spec, dataset, overrides });
+const AGREEMENT_LABELS = {
+  unanimous: '✅ all agree',
+  majority: '➗ majority',
+  split: '⚠️ they disagree',
+  single: 'ℹ️ only one source',
+  none: '—',
+};
+
+function showCompare(interaction, { dataset, reports }) {
+  const requested = interaction.options.getString('spec');
+
+  if (!requested) {
+    const split = disagreements({ dataset, specs: SPECS, reports });
+    const recorded = Object.keys(reports).length;
+
+    const embed = new EmbedBuilder()
+      .setColor(BRAND_COLOR)
+      .setTitle('Where the guides disagree')
+      .setDescription(
+        recorded === 0
+          ? 'No guide recommendations have been recorded yet. An officer can add them with `/consumables report`.'
+          : split.length === 0
+            ? `**${recorded}** source(s) recorded, and they agree everywhere they overlap.`
+            : split
+                .slice(0, 20)
+                .map((entry) => `**${entry.spec.name} ${entry.spec.className}** — ${entry.slots.join(', ')}`)
+                .join('\n'),
+      )
+      .setFooter({ text: FOOTER });
+
+    if (split.length > 20) {
+      embed.addFields({ name: '​', value: `…and ${split.length - 20} more` });
+    }
+
+    return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+  }
+
+  const spec = resolveSpecOption(requested);
+  if (!spec) {
+    return interaction.reply({
+      content: 'I could not tell which spec that is.',
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+
+  const { slots, sources } = compareSpec({ dataset, spec, reports });
+
+  const embed = new EmbedBuilder()
+    .setColor(BRAND_COLOR)
+    .setTitle(`${spec.name} ${spec.className} — what the guides say`)
+    .setFooter({ text: FOOTER });
+
+  if (sources.length === 0) {
+    embed.setDescription(
+      'Nothing recorded for this spec yet. An officer can add what a guide says with `/consumables report`.',
+    );
+    return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+  }
+
+  for (const slot of SLOTS) {
+    const { opinions, agreement } = slots[slot];
+
+    embed.addFields({
+      name: `${SLOT_LABELS[slot]} — ${AGREEMENT_LABELS[agreement]}`,
+      value:
+        opinions.length === 0
+          ? '_nobody has said_'
+          : opinions
+              .map((opinion) => {
+                const link = opinion.url ? ` ([source](${opinion.url}))` : '';
+                const age = opinion.fetchedAt
+                  ? ` · <t:${Math.floor(Date.parse(opinion.fetchedAt) / 1000)}:R>`
+                  : '';
+                return `**${opinion.name}**: ${opinion.item.name}${link}${age}`;
+              })
+              .join('\n')
+              .slice(0, 1024),
+    });
+  }
+
+  embed.addFields({
+    name: '​',
+    value:
+      'Where they disagree Herald picks nothing and falls back to the tier file — a split means the choice is close, or one guide is stale.',
+  });
+
+  return interaction.reply({ embeds: [embed] });
+}
+
+function showSpec(interaction, { spec, dataset, overrides, reports }) {
+  const resolved = resolveSpecConsumables({ spec, dataset, overrides, reports });
 
   const embed = new EmbedBuilder()
     .setColor(BRAND_COLOR)
@@ -247,9 +422,9 @@ function showSpec(interaction, { spec, dataset, overrides }) {
   return interaction.reply({ embeds: [embed] });
 }
 
-function showTier(interaction, { dataset, overrides }) {
+function showTier(interaction, { dataset, overrides, reports }) {
   const stats = coverage(dataset, SPEC_KEYS);
-  const missing = gaps({ specs: SPECS, dataset, overrides });
+  const missing = gaps({ specs: SPECS, dataset, overrides, reports });
 
   const embed = new EmbedBuilder()
     .setColor(BRAND_COLOR)
@@ -293,7 +468,7 @@ function showTier(interaction, { dataset, overrides }) {
   return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 }
 
-async function showShopping(interaction, { dataset, overrides, prices, store }) {
+async function showShopping(interaction, { dataset, overrides, prices, store, reports }) {
   const raidId = interaction.options.getString('raid');
   const rosterText = interaction.options.getString('roster');
 
@@ -341,7 +516,7 @@ async function showShopping(interaction, { dataset, overrides, prices, store }) 
     potion: interaction.options.getInteger('potions') ?? DEFAULT_PER_RAIDER.potion,
   };
 
-  const list = buildShoppingList({ roster: entries, dataset, overrides, perRaider });
+  const list = buildShoppingList({ roster: entries, dataset, overrides, perRaider, reports });
 
   const embed = new EmbedBuilder()
     .setColor(BRAND_COLOR)

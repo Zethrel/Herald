@@ -40,9 +40,10 @@ export function defaultGuildConfig() {
     removeDefaultOnPick: true,
     welcome: { channelId: null, messageId: null },
     setupAt: null,
-    // This server's departures from the tier file: spec key -> { flask, food,
-    // potion, source, updatedAt, setBy }.
-    consumables: { overrides: {} },
+    // `overrides` is what this server decided, spec key -> { flask, food,
+    // potion, ... }. `reports` is what a guide was recorded as saying, source
+    // id -> specs. Kept apart so a guide's opinion never blurs into a decision.
+    consumables: { overrides: {}, reports: {} },
     // raid id -> raid, and user id -> the spec they last signed up as.
     raids: {},
     mains: {},
