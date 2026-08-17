@@ -131,6 +131,13 @@ is a slash command, so it has to be run from a server the bot is in — start wi
 an empty allowlist and the default action and the bot will dutifully leave
 everywhere, including the server you meant to run it from.
 
+Two things to know about the alerts. A bot can only DM someone it shares a
+server with, so an owner who is not in one of the bot's servers will never get
+the DM — set `ALERT_WEBHOOK_URL` as well and the alert lands in a channel
+regardless. And the *added by* line comes from the other server's audit log,
+which needs View Audit Log there; without it the alert still arrives, with the
+inviter listed as unknown.
+
 ## Running it
 
 Node 22 or newer. `discord.js` is the only dependency.
