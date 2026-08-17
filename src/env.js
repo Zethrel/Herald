@@ -4,9 +4,55 @@
 //
 // `npm start` passes --env-file-if-exists=.env, so no dotenv dependency.
 
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { ACTIONS } from './access/approval.js';
+
+// Files people end up with instead of `.env`. The first is by far the most
+// common: Windows hides known extensions, so Notepad's "Save as .env" quietly
+// writes `.env.txt` and File Explorer shows it as `.env`.
+const LOOKALIKES = ['.env.txt', '.env.env', 'env', 'env.txt', '.env.local', '.ENV'];
+
+/**
+ * Why the variables are missing, in the terms someone can act on: which folder
+ * was looked in, whether a file is there at all, and -- if it is -- which keys
+ * it defines. Never the values: a token in a log is a leaked token.
+ */
+export function diagnoseEnvFile(cwd = process.cwd()) {
+  const path = resolve(cwd, '.env');
+
+  if (!existsSync(path)) {
+    const found = LOOKALIKES.filter((name) => existsSync(resolve(cwd, name)));
+
+    return [
+      `No .env file in ${cwd}`,
+      found.length > 0
+        ? `Found ${found.join(', ')} instead — rename it to exactly \`.env\`. (Windows hides known extensions, so Notepad writes .env.txt while Explorer shows ".env".)`
+        : 'Either you are in the wrong folder — it must be the one containing package.json — or the file was saved under another name.',
+      'Create it with: cp .env.example .env',
+    ];
+  }
+
+  let keys = [];
+  try {
+    keys = readFileSync(path, 'utf8')
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith('#'))
+      .map((line) => line.split('=')[0].trim())
+      .filter(Boolean);
+  } catch (error) {
+    return [`Found ${path} but could not read it: ${error.message}`];
+  }
+
+  return [
+    `Found ${path}, defining: ${keys.join(', ') || '(nothing)'}`,
+    keys.length === 0
+      ? 'Every line is blank or commented out — the values go after the `=`, with no `#` in front.'
+      : 'A key listed above with nothing after its `=` counts as unset.',
+  ];
+}
 
 /** Comma- or whitespace-separated ids, tolerant of trailing commas and spaces. */
 export function parseIdList(value) {
@@ -30,7 +76,14 @@ export function readEnv(env = process.env) {
 
   if (missing.length > 0) {
     throw new Error(
-      `Missing required environment variable(s): ${missing.join(', ')}. Copy .env.example to .env and fill it in.`,
+      [
+        `Missing required environment variable(s): ${missing.join(', ')}`,
+        '',
+        ...diagnoseEnvFile(),
+        '',
+        'DISCORD_TOKEN is the Bot token — Developer Portal → your app → Bot → Reset Token.',
+        'It is not the Application ID and not the Public Key.',
+      ].join('\n'),
     );
   }
 

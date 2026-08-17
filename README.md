@@ -552,7 +552,7 @@ It refuses to start without `OWNER_IDS`: a bot that cannot tell anyone about an
 unapproved invite is worse than one that will not boot.
 
 ```sh
-npm test                  # 302 tests, no network needed
+npm test                  # 306 tests, no network needed
 ```
 
 ### Discord Developer Portal

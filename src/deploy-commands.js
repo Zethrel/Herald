@@ -11,7 +11,15 @@ import { commandPayload } from './commands/index.js';
 import { createLogger } from './logger.js';
 import { readEnv } from './env.js';
 
-const env = readEnv();
+let env;
+try {
+  env = readEnv();
+} catch (error) {
+  // A setup problem, not a crash: the stack trace tells nobody anything.
+  console.error(`\n${error.message}\n`);
+  process.exit(1);
+}
+
 const log = createLogger(env.logLevel);
 const body = commandPayload();
 

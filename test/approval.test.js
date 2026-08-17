@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { after, before, describe, it } from 'node:test';
 
 import {
   ACTIONS,
@@ -9,7 +12,7 @@ import {
   isApproved,
   planGuildAccess,
 } from '../src/access/approval.js';
-import { parseIdList, readEnv } from '../src/env.js';
+import { diagnoseEnvFile, parseIdList, readEnv } from '../src/env.js';
 
 const guild = (id, name = `server ${id}`) => ({ id, name, memberCount: 10, ownerId: 'owner' });
 
@@ -140,5 +143,50 @@ describe('readEnv', () => {
 
     assert.deepEqual(env.ownerIds, ['1', '2']);
     assert.deepEqual(env.approvedGuilds, ['10', '11']);
+  });
+});
+
+describe('diagnoseEnvFile', () => {
+  // The error people actually hit first. It has to name the folder, the file
+  // and the fix -- and never the token itself.
+  let dir;
+
+  before(async () => {
+    dir = await mkdtemp(join(tmpdir(), 'herald-env-'));
+  });
+
+  after(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it('says which folder it looked in when there is no file', () => {
+    const lines = diagnoseEnvFile(dir).join('\n');
+
+    assert.match(lines, new RegExp(`No .env file in ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
+    assert.match(lines, /wrong folder/);
+  });
+
+  it('spots the Notepad .env.txt trap by name', async () => {
+    await writeFile(join(dir, '.env.txt'), 'DISCORD_TOKEN=x\n');
+    const lines = diagnoseEnvFile(dir).join('\n');
+
+    assert.match(lines, /Found \.env\.txt instead/);
+    assert.match(lines, /hides known extensions/);
+    await rm(join(dir, '.env.txt'));
+  });
+
+  it('lists the keys a real file defines, and none of their values', async () => {
+    await writeFile(join(dir, '.env'), '# a comment\nDISCORD_TOKEN=super.secret.value\nOWNER_IDS=123\n');
+    const lines = diagnoseEnvFile(dir).join('\n');
+
+    assert.match(lines, /defining: DISCORD_TOKEN, OWNER_IDS/);
+    assert.ok(!lines.includes('super.secret.value'), 'the token must never appear in an error');
+    await rm(join(dir, '.env'));
+  });
+
+  it('says so when every line is commented out', async () => {
+    await writeFile(join(dir, '.env'), '# DISCORD_TOKEN=x\n\n');
+    assert.match(diagnoseEnvFile(dir).join('\n'), /blank or commented out/);
+    await rm(join(dir, '.env'));
   });
 });

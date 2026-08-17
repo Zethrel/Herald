@@ -8,7 +8,14 @@ import { loadDataset } from './consumables/dataset.js';
 import { priceServiceFromEnv } from './prices/service.js';
 import { readEnv } from './env.js';
 
-const env = readEnv();
+let env;
+try {
+  env = readEnv();
+} catch (error) {
+  console.error(`\n${error.message}\n`);
+  process.exit(1);
+}
+
 const log = createLogger(env.logLevel);
 const store = createStore(env.dataFile);
 
