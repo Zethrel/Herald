@@ -14,10 +14,15 @@
 // and a file with one bad line still contributes every good one.
 
 import { ROLES, STATS, findSpec } from '../game/specs.js';
-import { SLOTS } from './dataset.js';
+import { ALL_KEY, SECONDARY_ALIASES, SECONDARY_STATS, SLOTS } from './dataset.js';
 import { slugify } from '../sync/tierSync.js';
 
-const DEFAULT_KEYS = new Set([...Object.values(STATS), ...Object.values(ROLES)]);
+const DEFAULT_KEYS = new Set([
+  ALL_KEY,
+  ...SECONDARY_STATS,
+  ...Object.values(STATS),
+  ...Object.values(ROLES),
+]);
 
 // What people actually type for each slot.
 const SLOT_ALIASES = {
@@ -32,7 +37,14 @@ const SLOT_ALIASES = {
   pot: 'potion',
   potions: 'potion',
   'combat potion': 'potion',
+  oil: 'oil',
+  'weapon oil': 'oil',
+  oils: 'oil',
 };
+
+// Not an item: which secondary stat a spec stacks, which is what picks its
+// flask. Written on a spec line as `secondary = crit`.
+const SECONDARY_FIELD = 'secondary';
 
 function parseAssignments(text, lineNumber, errors) {
   const assignments = {};
@@ -50,12 +62,30 @@ function parseAssignments(text, lineNumber, errors) {
       continue;
     }
 
-    const slot = SLOT_ALIASES[match[1].trim().toLowerCase()];
+    const field = match[1].trim().toLowerCase();
+    const value0 = match[2].trim();
+
+    if (field === SECONDARY_FIELD) {
+      if (!value0 || value0 === '-') continue;
+      const secondary = SECONDARY_ALIASES[value0.toLowerCase()];
+      if (!secondary) {
+        errors.push({
+          line: lineNumber,
+          text: trimmed,
+          reason: `unknown secondary "${value0}" — use ${SECONDARY_STATS.join(', ')}`,
+        });
+        continue;
+      }
+      assignments[SECONDARY_FIELD] = secondary;
+      continue;
+    }
+
+    const slot = SLOT_ALIASES[field];
     if (!slot) {
       errors.push({
         line: lineNumber,
         text: trimmed,
-        reason: `unknown slot "${match[1].trim()}" — use ${SLOTS.join(', ')}`,
+        reason: `unknown slot "${field}" — use ${SLOTS.join(', ')}, or \`secondary\``,
       });
       continue;
     }
@@ -90,7 +120,11 @@ export function parseTierText(text) {
 
   const store = (target, key, assignments) => {
     const entry = target[key] ?? {};
-    for (const [slot, name] of Object.entries(assignments)) entry[slot] = remember(name);
+    for (const [slot, name] of Object.entries(assignments)) {
+      // A stat name, not an item: it selects a default block rather than
+      // naming something anyone puts in their bags.
+      entry[slot] = slot === SECONDARY_FIELD ? name : remember(name);
+    }
     target[key] = entry;
   };
 

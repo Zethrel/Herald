@@ -8,13 +8,34 @@
 
 import { readFile } from 'node:fs/promises';
 
-export const SLOTS = ['flask', 'food', 'potion'];
+export const SLOTS = ['flask', 'food', 'potion', 'oil'];
 
 export const SLOT_LABELS = {
   flask: 'Flask',
   food: 'Food buff',
   potion: 'Combat potion',
+  oil: 'Weapon oil',
 };
+
+// Modern flasks give a secondary stat, not a primary one, so which flask a spec
+// wants follows its stat priority rather than its class. That priority is a
+// per-spec, per-tier judgement -- it cannot be derived from the catalogue the
+// way intellect-or-agility can -- so a spec declares its secondary in the tier
+// file and the flask follows from that.
+export const SECONDARY_STATS = ['crit', 'haste', 'mastery', 'versatility'];
+
+export const SECONDARY_ALIASES = {
+  crit: 'crit',
+  'critical strike': 'crit',
+  crits: 'crit',
+  haste: 'haste',
+  mastery: 'mastery',
+  vers: 'versatility',
+  versatility: 'versatility',
+};
+
+/** The default block that applies to every spec, whatever it plays. */
+export const ALL_KEY = 'all';
 
 export function emptyDataset() {
   return {

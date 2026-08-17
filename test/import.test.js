@@ -141,9 +141,10 @@ describe('applyImport', () => {
       normalizeDataset({}),
       parseTierText(
         [
-          'intellect: flask = Flask I; food = Feast A; potion = Potion I',
-          'agility: flask = Flask A; food = Feast A; potion = Potion A',
-          'strength: flask = Flask S; food = Feast A; potion = Potion S',
+          'all: food = Feast A; oil = Oil A',
+          'intellect: flask = Flask I; potion = Potion I',
+          'agility: flask = Flask A; potion = Potion A',
+          'strength: flask = Flask S; potion = Potion S',
           'fire mage: potion = Potion Fire',
         ].join('\n'),
       ),
@@ -192,5 +193,42 @@ describe('applyImportAsReport', () => {
     const resolved = resolveSpecConsumables({ spec: specByKey('mage.fire'), dataset: next });
     assert.equal(resolved.slots.flask.item.name, 'Flask of X');
     assert.equal(resolved.slots.flask.via, 'sources');
+  });
+});
+
+describe('the corrected consumable model', () => {
+  it('reads a secondary declaration as a stat, not an item', () => {
+    const parsed = parseTierText('fire mage: secondary = mastery');
+
+    assert.deepEqual(parsed.specs['mage.fire'], { secondary: 'mastery' });
+    // It must not turn up in the shopping list as something to buy.
+    assert.deepEqual(parsed.items, {});
+  });
+
+  it('accepts the ways people write the secondaries', () => {
+    const parsed = parseTierText('fire mage: secondary = Critical Strike\nfrost mage: secondary = vers');
+
+    assert.equal(parsed.specs['mage.fire'].secondary, 'crit');
+    assert.equal(parsed.specs['mage.frost'].secondary, 'versatility');
+  });
+
+  it('names an unknown secondary rather than accepting it', () => {
+    const parsed = parseTierText('fire mage: secondary = spellpower');
+
+    assert.match(parsed.errors[0].reason, /unknown secondary/);
+    assert.deepEqual(parsed.specs, {});
+  });
+
+  it('takes the secondary-stat and `all` blocks as defaults', () => {
+    const parsed = parseTierText(
+      ['all: food = Feast; potion = Main Potion', 'crit: flask = Crit Flask; oil = Crit Oil'].join('\n'),
+    );
+
+    assert.deepEqual(parsed.defaults.all, { food: 'feast', potion: 'main-potion' });
+    assert.deepEqual(parsed.defaults.crit, { flask: 'crit-flask', oil: 'crit-oil' });
+  });
+
+  it('reads the weapon oil slot', () => {
+    assert.equal(parseTierText('all: weapon oil = Some Oil').defaults.all.oil, 'some-oil');
   });
 });

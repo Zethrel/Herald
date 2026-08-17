@@ -77,7 +77,7 @@ needs editing.
 | `/raid close\|cancel\|delete <raid>` | Stop signups, call it off, or remove it (Manage Server). |
 | `/raid timezone <zone>` | The timezone `/raid create` reads times in (Manage Server). |
 | `/raid reminders [lead_times] [raid]` | When the roster gets pinged, for the server or one raid (Manage Server). |
-| `/consumables spec <spec>` | Flask, food and potion for one spec, with where the answer came from. |
+| `/consumables spec <spec>` | Flask, food, potion and weapon oil for one spec, with where the answer came from. |
 | `/consumables shopping [roster] [raid] [flasks] [food] [potions]` | Rolls a roster up into consumables, crafts and reagents. |
 | `/consumables tier` | Which tier the data is for, how complete it is, what is still missing. |
 | `/consumables compare [spec]` | What Method says, against the guild's own call. |
@@ -244,7 +244,7 @@ The file has four parts:
 | `items` | slug → name, item id (drives the Wowhead links) |
 | `reports` | what Method says, per spec — see *What Method says* |
 | `recipes` | slug → profession, yield, reagents. This is what makes the shopping list possible |
-| `defaults` | per role (`healer`, `tank`) and per primary stat (`intellect`, `agility`, `strength`) |
+| `defaults` | per secondary (`crit`, `haste`, `mastery`, `versatility`), per role (`healer`, `tank`), per primary stat (`intellect`, `agility`, `strength`), and `all` |
 | `specs` | per spec, when a spec departs from its stat's default |
 
 Answers resolve most specific first: **this server's override → the spec's own
@@ -315,25 +315,28 @@ npm run import-tier -- tiers/current.txt         # write it
 npm run sync-tier                                # item ids, yields, reagents
 ```
 
-The top of the file is five lines, and for most tiers they are the whole job:
+The top of the file is already filled in with the current tier's shared items:
 
 ```
-intellect: flask = Flask of X; food = Feast of Y; potion = Potion of Z
-agility:   flask = ...
-strength:  flask = ...
-healer:    food = ...
-tank:      food = ...
+all: food = Harandar Celebration
+all: potion = Light's Potential
+
+crit:         flask = Flask of the Shattered Sun; oil = Thalassian Phoenix Oil
+haste:        flask = Flask of the Blood Knights; oil = Thalassian Phoenix Oil
+mastery:      flask = Flask of the Magisters
+versatility:  flask = Flask of Thalassian Resistance
 ```
 
 Below that is every spec, commented out, each with a link to its Method page.
-Uncomment one only where Method says something different from the default above,
-and list only the slot that differs:
+Uncomment the ones you raid with and give each its stat priority — that one word
+is what selects its flask and oil:
 
 ```
-fire mage: potion = Potion of Something Else
+fire mage:          secondary = mastery
+protection warrior: secondary = versatility; potion = Potion of Recklessness
 ```
 
-Four filled-in default lines answer all 39 specs with no gaps. Item names may
+Add item slots only where a spec departs from the blocks above. Item names may
 contain commas — assignments are separated by semicolons for exactly that
 reason — a `-` or a blank means "not filled in yet" and is skipped, and `#`
 starts a comment. A line it cannot read is reported with its line number and
@@ -510,7 +513,7 @@ It refuses to start without `OWNER_IDS`: a bot that cannot tell anyone about an
 unapproved invite is worse than one that will not boot.
 
 ```sh
-npm test                  # 276 tests, no network needed
+npm test                  # 287 tests, no network needed
 ```
 
 ### Discord Developer Portal

@@ -139,6 +139,20 @@ export function consensusFor({ dataset, spec, reports = null }) {
   return answer;
 }
 
+/**
+ * The secondary stat a source reported for a spec -- which is what picks the
+ * flask. Only where the sources agree: two guides naming different stat
+ * priorities is a real disagreement, and guessing between them would hand
+ * someone the wrong flask.
+ */
+export function reportedSecondary({ dataset, spec, reports = null }) {
+  const all = reports ?? dataset.reports ?? {};
+  const named = SOURCES.map((source) => all[source.id]?.specs?.[spec.key]?.secondary).filter(Boolean);
+
+  if (named.length === 0) return null;
+  return named.every((value) => value === named[0]) ? named[0] : null;
+}
+
 /** Every spec where the guides disagree, for `/consumables compare` with no spec. */
 export function disagreements({ dataset, specs, reports = null }) {
   const found = [];

@@ -14,6 +14,7 @@ const dataset = normalizeDataset({
     'flask-agi': { name: 'Flask of Agility', itemId: 222 },
     'feast-of-testing': { name: 'Feast of Testing', itemId: 333 },
     'potion-int': { name: 'Potion of Intellect', itemId: 444 },
+    'test-oil': { name: 'Test Oil', itemId: 555 },
     'herb-a': { name: 'Herb A' },
     'herb-b': { name: 'Herb B' },
   },
@@ -34,7 +35,13 @@ const dataset = normalizeDataset({
     healer: { food: 'feast-of-testing' },
   },
   specs: {
-    'mage.fire': { flask: 'flask-int', food: 'feast-of-testing', potion: 'potion-int', source: 'a sim' },
+    'mage.fire': {
+      flask: 'flask-int',
+      food: 'feast-of-testing',
+      potion: 'potion-int',
+      oil: 'test-oil',
+      source: 'a sim',
+    },
   },
 });
 
@@ -278,7 +285,9 @@ describe('buildShoppingList', () => {
       dataset,
     });
 
-    assert.deepEqual(list.missingSlots, [{ spec: specByKey('rogue.outlaw'), slots: ['food', 'potion'] }]);
+    assert.deepEqual(list.missingSlots, [
+      { spec: specByKey('rogue.outlaw'), slots: ['food', 'potion', 'oil'] },
+    ]);
     assert.equal(list.consumables.length, 1);
   });
 
@@ -287,5 +296,85 @@ describe('buildShoppingList', () => {
 
     assert.equal(list.consumables.length, 1);
     assert.equal(list.consumables[0].slug, 'flask-int');
+  });
+});
+
+describe('flasks follow the secondary stat', () => {
+  // Modern flasks give a secondary, so the flask cannot be derived from the
+  // class the way a main-stat potion can. A spec declares what it stacks and
+  // the flask follows; without that declaration there is no flask to give.
+  const tier = normalizeDataset({
+    items: {
+      'flask-crit': { name: 'Flask of the Shattered Sun' },
+      'flask-mastery': { name: 'Flask of the Magisters' },
+      'crit-oil': { name: 'Thalassian Phoenix Oil' },
+      feast: { name: 'Harandar Celebration' },
+      'main-potion': { name: "Light's Potential" },
+      reckless: { name: 'Potion of Recklessness' },
+    },
+    defaults: {
+      all: { food: 'feast', potion: 'main-potion' },
+      crit: { flask: 'flask-crit', oil: 'crit-oil' },
+      mastery: { flask: 'flask-mastery' },
+    },
+    specs: {
+      'mage.fire': { secondary: 'mastery' },
+      'mage.frost': { secondary: 'crit' },
+      'warrior.protection': { secondary: 'crit', potion: 'reckless' },
+    },
+  });
+
+  it('picks the flask from the declared secondary', () => {
+    const fire = resolveSpecConsumables({ spec: specByKey('mage.fire'), dataset: tier });
+
+    assert.equal(fire.secondary, 'mastery');
+    assert.equal(fire.slots.flask.item.name, 'Flask of the Magisters');
+    assert.equal(fire.slots.flask.via, 'default:mastery');
+  });
+
+  it('gives no flask at all when no secondary is declared', () => {
+    // The honest answer. Handing an unstated spec a flask would be picking a
+    // stat priority on their behalf.
+    const rogue = resolveSpecConsumables({ spec: specByKey('rogue.outlaw'), dataset: tier });
+
+    assert.equal(rogue.secondary, null);
+    assert.equal(rogue.slots.flask.item, null);
+  });
+
+  it('takes the weapon oil from the same block, and leaves it empty where there is none', () => {
+    const frost = resolveSpecConsumables({ spec: specByKey('mage.frost'), dataset: tier });
+    assert.equal(frost.slots.oil.item.name, 'Thalassian Phoenix Oil');
+
+    // No mastery oil exists, so a mastery spec gets none rather than the crit one.
+    const fire = resolveSpecConsumables({ spec: specByKey('mage.fire'), dataset: tier });
+    assert.equal(fire.slots.oil.item, null);
+  });
+
+  it('answers food and the main-stat potion for everyone from `all`', () => {
+    for (const key of ['mage.fire', 'rogue.outlaw', 'warrior.arms']) {
+      const resolved = resolveSpecConsumables({ spec: specByKey(key), dataset: tier });
+      assert.equal(resolved.slots.food.item.name, 'Harandar Celebration', key);
+      assert.equal(resolved.slots.food.via, 'default:all', key);
+    }
+  });
+
+  it('lets a spec override the shared potion', () => {
+    const prot = resolveSpecConsumables({ spec: specByKey('warrior.protection'), dataset: tier });
+
+    assert.equal(prot.slots.potion.item.name, 'Potion of Recklessness');
+    assert.equal(prot.slots.potion.via, 'spec');
+    // …without disturbing the flask it gets from its secondary.
+    assert.equal(prot.slots.flask.item.name, 'Flask of the Shattered Sun');
+  });
+
+  it("lets a server's own choice of secondary win", () => {
+    const resolved = resolveSpecConsumables({
+      spec: specByKey('mage.fire'),
+      dataset: tier,
+      overrides: { 'mage.fire': { secondary: 'crit' } },
+    });
+
+    assert.equal(resolved.secondary, 'crit');
+    assert.equal(resolved.slots.flask.item.name, 'Flask of the Shattered Sun');
   });
 });
