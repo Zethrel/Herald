@@ -16,9 +16,17 @@ import {
 } from '../src/raids/model.js';
 import { discordTime, isValidTimeZone, parseWhen, zonedTimeToUtc } from '../src/raids/time.js';
 import { getMain, saveRaid, setMain, updateRaid, upcomingRaids } from '../src/raids/repository.js';
-import { customId, parseCustomId } from '../src/raids/render.js';
+import {
+  buildClassSelect,
+  buildRaidButtons,
+  buildRaidEmbed,
+  buildSpecSelect,
+  customId,
+  parseCustomId,
+} from '../src/raids/render.js';
+import { buildReminderMessage } from '../src/raids/scheduler.js';
+import { SPECS, specByKey } from '../src/game/specs.js';
 import { createStore } from '../src/store.js';
-import { specByKey } from '../src/game/specs.js';
 
 const raidAt = (iso = '2026-08-20T18:00:00Z') =>
   createRaid({ id: 'raid-1', title: 'Heroic', startsAt: new Date(iso), createdBy: 'gm', timeZone: 'UTC' });
@@ -343,5 +351,58 @@ describe('the raid repository', () => {
       upcoming.map((raid) => raid.id),
       ['raid-1', 'raid-2'],
     );
+  });
+});
+
+describe('a full raid stays inside Discord limits', () => {
+  // Discord rejects a message rather than truncating it, so the biggest
+  // realistic post is worth asserting rather than discovering on raid night.
+  function fullRaid(size) {
+    let raid = raidAt();
+    for (let index = 0; index < size; index += 1) {
+      // Real 18-digit snowflakes as strings: building them with arithmetic
+      // silently collapses past Number.MAX_SAFE_INTEGER.
+      const userId = String(100000000000000000n + BigInt(index));
+      raid = applySignup(raid, { userId, status: 'yes', specKey: SPECS[index % SPECS.length].key }).raid;
+    }
+    return raid;
+  }
+
+  it('renders a 40-signup post within the embed limits', () => {
+    const embed = buildRaidEmbed(fullRaid(40)).toJSON();
+
+    assert.ok(embed.fields.length <= 25, `${embed.fields.length} fields`);
+    assert.ok(JSON.stringify(embed).length < 6000, 'embed under 6000 characters');
+    for (const field of embed.fields) {
+      assert.ok(field.value.length <= 1024, `field "${field.name}" is ${field.value.length} characters`);
+      assert.ok(field.name.length <= 256, `field name "${field.name}" too long`);
+    }
+  });
+
+  it('keeps every button and select inside its own limits', () => {
+    const raid = fullRaid(40);
+    const rows = buildRaidButtons(raid);
+
+    assert.ok(rows.length <= 5, 'at most five action rows');
+    for (const row of rows) {
+      const json = row.toJSON();
+      assert.ok(json.components.length <= 5, 'at most five components per row');
+      for (const component of json.components) {
+        assert.ok(component.custom_id.length <= 100, `custom_id ${component.custom_id.length} characters`);
+      }
+    }
+
+    assert.ok(buildClassSelect(raid.id, 'yes').toJSON().components[0].options.length <= 25);
+    for (const className of new Set(SPECS.map((spec) => spec.className))) {
+      const options = buildSpecSelect(raid.id, 'yes', className).toJSON().components[0].options;
+      assert.ok(options.length > 0 && options.length <= 25, `${className}: ${options.length} options`);
+    }
+  });
+
+  it('keeps a 40-raider reminder ping under the message limit', () => {
+    const message = buildReminderMessage(fullRaid(40), 60);
+
+    assert.equal(message.allowedMentions.users.length, 40);
+    assert.ok(message.content.length <= 2000, `${message.content.length} characters of mentions`);
   });
 });
