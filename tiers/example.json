@@ -1,0 +1,66 @@
+{
+  "_comment": "An illustrative tier file. The item names here are invented — this file exists to show the format, not to be used. Copy the shape into current.json, put real names in, and run `npm run sync-tier` to fill in the ids, yields and reagents from Blizzard's API.",
+
+  "schema": 1,
+  "tier": {
+    "name": "Example Raid",
+    "patch": "0.0.1",
+    "expansion": "Example"
+  },
+  "updatedAt": "2026-01-01T00:00:00Z",
+  "staleAfterDays": 90,
+  "sources": [
+    "https://example.invalid/guide — where the spec mapping came from",
+    "Blizzard Game Data API — item ids, yields and reagents (npm run sync-tier)"
+  ],
+
+  "items": {
+    "flask-of-example-intellect": { "name": "Flask of Example Intellect", "craft": true, "itemId": 100001 },
+    "flask-of-example-agility": { "name": "Flask of Example Agility", "craft": true, "itemId": 100002 },
+    "flask-of-example-strength": { "name": "Flask of Example Strength", "craft": true, "itemId": 100003 },
+    "example-feast": { "name": "Example Feast", "itemId": 100010 },
+    "example-healer-food": { "name": "Example Healer Food", "itemId": 100011 },
+    "potion-of-example-power": { "name": "Potion of Example Power", "craft": true, "itemId": 100020 },
+    "example-herb": { "name": "Example Herb", "itemId": 100100 },
+    "example-water": { "name": "Example Water", "itemId": 100101 }
+  },
+
+  "recipes": {
+    "flask-of-example-intellect": {
+      "profession": "Alchemy",
+      "yield": 2,
+      "reagents": [
+        { "item": "example-herb", "quantity": 4 },
+        { "item": "example-water", "quantity": 1 }
+      ]
+    },
+    "potion-of-example-power": {
+      "profession": "Alchemy",
+      "yield": 3,
+      "reagents": [{ "item": "example-herb", "quantity": 2 }]
+    }
+  },
+
+  "defaults": {
+    "intellect": {
+      "flask": "flask-of-example-intellect",
+      "food": "example-feast",
+      "potion": "potion-of-example-power"
+    },
+    "agility": { "flask": "flask-of-example-agility", "food": "example-feast" },
+    "strength": { "flask": "flask-of-example-strength", "food": "example-feast" },
+    "healer": { "food": "example-healer-food" },
+    "tank": {}
+  },
+
+  "specs": {
+    "mage.fire": {
+      "flask": "flask-of-example-intellect",
+      "food": "example-feast",
+      "potion": "potion-of-example-power",
+      "source": "https://example.invalid/fire-mage",
+      "updatedAt": "2026-01-01T00:00:00Z",
+      "note": "Only write a spec entry where the spec departs from its stat default."
+    }
+  }
+}

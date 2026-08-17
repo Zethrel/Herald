@@ -8,7 +8,7 @@
   "updatedAt": null,
   "staleAfterDays": 90,
   "sources": [],
-  "note": "Nothing is filled in yet. Herald refuses to invent consumables: an empty slot renders as 'not set for this tier' rather than a guess. Fill this in from a source you trust, or with /consumables set, and put the link in `sources` so the raid can check it.",
+  "note": "Nothing is filled in yet. Herald refuses to invent consumables: an empty slot renders as 'not set for this tier' rather than a guess. See example.json for the shape. Fill in `items` (a name and \"craft\": true is enough) plus `defaults`/`specs` from a source you trust, put the link in `sources`, then run `npm run sync-tier` to have Blizzard's API fill in the item ids, craft yields and reagents.",
 
   "items": {},
 

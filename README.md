@@ -154,7 +154,39 @@ slot:flask item:... source:...` overrides it for that server only, and
 `/consumables clear` puts it back.
 
 The file is read once at startup, so editing it means a restart — the same cost
-as editing `.env`.
+as editing `.env`. [`tiers/example.json`](tiers/example.json) shows the shape
+filled in, with invented item names.
+
+### Filling in the facts: `npm run sync-tier`
+
+The judgement half — which flask a spec wants — is yours. The facts half is
+Blizzard's, and the sync fetches it from their Game Data API:
+
+```sh
+npm run sync-tier -- --dry     # show what it would do
+npm run sync-tier              # write it back
+```
+
+You write a name and a flag:
+
+```json
+"items": { "flask-of-x": { "name": "Flask of X", "craft": true } }
+```
+
+and it fills in the item id, finds the recipe, and writes the craft yield, the
+reagents and an item entry for each reagent it had not seen before. Re-run it
+after a patch and it picks up changed reagents and yields.
+
+It never writes to `specs`, `defaults`, `sources` or your notes, and it never
+overwrites something you set by hand: pin an item id yourself and a search that
+disagrees is reported rather than applied. A variable-yield recipe is taken at
+its **minimum**, because a shopping list built on the lucky outcome sends
+someone back to the auction house mid-raid.
+
+Credentials are free — create a client at
+[develop.battle.net](https://develop.battle.net) and put `BLIZZARD_CLIENT_ID`
+and `BLIZZARD_CLIENT_SECRET` in `.env`. They are used by this script only; the
+running bot never talks to Blizzard.
 
 ## Approved servers
 
@@ -220,7 +252,7 @@ It refuses to start without `OWNER_IDS`: a bot that cannot tell anyone about an
 unapproved invite is worse than one that will not boot.
 
 ```sh
-npm test                  # 100 tests, no network needed
+npm test                  # 125 tests, no network needed
 ```
 
 ### Discord Developer Portal
@@ -260,6 +292,7 @@ src/
 ├── access/            which servers may run the bot, and telling you when one may not
 ├── consumables/       the tier file, spec resolution and the shopping list (pure)
 ├── game/              the class and specialisation catalogue — data
+├── sync/              the Blizzard API client, and the transforms it feeds
 ├── plan/              diff the blueprint against a live server (pure)
 ├── apply/             execute the diff
 ├── ranks/             who gets which rank, and when (pure)
