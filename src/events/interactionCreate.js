@@ -7,6 +7,16 @@ import { currentApproved } from '../access/guard.js';
 export const name = Events.InteractionCreate;
 
 export async function execute(interaction, context) {
+  // Type-ahead. Discord gives three seconds and ignores a late reply, so this
+  // runs before anything that touches the store or the network.
+  if (interaction.isAutocomplete()) {
+    const command = commandsByName.get(interaction.commandName);
+    if (!command?.autocomplete) return;
+    return command.autocomplete(interaction, context).catch((error) => {
+      context.log.warn(`Autocomplete for /${interaction.commandName} failed: ${error.message}`);
+    });
+  }
+
   if (!interaction.isChatInputCommand()) return;
 
   const command = commandsByName.get(interaction.commandName);

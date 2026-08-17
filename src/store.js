@@ -39,6 +39,9 @@ export function defaultGuildConfig() {
     removeDefaultOnPick: true,
     welcome: { channelId: null, messageId: null },
     setupAt: null,
+    // This server's departures from the tier file: spec key -> { flask, food,
+    // potion, source, updatedAt, setBy }.
+    consumables: { overrides: {} },
   };
 }
 

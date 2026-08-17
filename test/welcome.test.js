@@ -56,7 +56,7 @@ describe('command definitions', () => {
     const payload = commandPayload();
     const names = payload.map((command) => command.name);
 
-    assert.deepEqual(names, ['setup', 'welcome', 'config', 'rank', 'guilds', 'about']);
+    assert.deepEqual(names, ['setup', 'welcome', 'config', 'rank', 'consumables', 'guilds', 'about']);
     assert.ok(payload.every((command) => command.description.length > 0));
   });
 
@@ -65,6 +65,17 @@ describe('command definitions', () => {
     for (const name of ['setup', 'welcome', 'config', 'rank', 'guilds']) {
       const command = payload.find((entry) => entry.name === name);
       assert.ok(command.default_member_permissions, `${name} should require a permission`);
+    }
+  });
+
+  it('leaves the commands raiders need open to raiders', () => {
+    // /consumables is a lookup: everyone should be able to ask what their own
+    // spec brings. Its `set` and `clear` subcommands check Manage Server in
+    // code instead, so the whole command does not have to be locked down.
+    const payload = commandPayload();
+    for (const name of ['consumables', 'about']) {
+      const command = payload.find((entry) => entry.name === name);
+      assert.ok(!command.default_member_permissions, `${name} should be open`);
     }
   });
 });

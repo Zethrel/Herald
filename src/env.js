@@ -48,6 +48,8 @@ export function readEnv(env = process.env) {
     // can take up to an hour to propagate.
     devGuildId: env.DISCORD_GUILD_ID?.trim() || null,
     dataFile: resolve(env.DATA_FILE?.trim() || 'data/guilds.json'),
+    // The tier's consumables, edited by hand and read at startup.
+    tierFile: resolve(env.TIER_FILE?.trim() || 'tiers/current.json'),
     logLevel: env.LOG_LEVEL?.trim() || 'info',
     // Who may run /guilds, and who gets told about an unapproved invite.
     ownerIds,

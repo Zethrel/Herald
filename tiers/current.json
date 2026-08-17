@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "tier": {
+    "name": null,
+    "patch": null,
+    "expansion": null
+  },
+  "updatedAt": null,
+  "staleAfterDays": 90,
+  "sources": [],
+  "note": "Nothing is filled in yet. Herald refuses to invent consumables: an empty slot renders as 'not set for this tier' rather than a guess. Fill this in from a source you trust, or with /consumables set, and put the link in `sources` so the raid can check it.",
+
+  "items": {},
+
+  "recipes": {},
+
+  "defaults": {
+    "intellect": {},
+    "agility": {},
+    "strength": {},
+    "healer": {},
+    "tank": {}
+  },
+
+  "specs": {}
+}

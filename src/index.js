@@ -3,11 +3,22 @@ import { Client, Events, GatewayIntentBits, Partials } from 'discord.js';
 import { createLogger } from './logger.js';
 import { createStore } from './store.js';
 import { events } from './events/index.js';
+import { loadDataset } from './consumables/dataset.js';
 import { readEnv } from './env.js';
 
 const env = readEnv();
 const log = createLogger(env.logLevel);
 const store = createStore(env.dataFile);
+
+// Read once at startup: it is a hand-edited file, and a raid night is not the
+// time to discover it stopped parsing. Editing it means a restart, which is the
+// same cost as editing .env.
+const dataset = await loadDataset(env.tierFile);
+log.info(
+  `Tier data: ${dataset.tier.name ?? 'unnamed'} (${Object.keys(dataset.specs).length} spec entries, ${
+    Object.keys(dataset.recipes).length
+  } recipes)`,
+);
 
 const client = new Client({
   intents: [
@@ -22,7 +33,7 @@ const client = new Client({
   partials: [Partials.Message, Partials.Channel, Partials.Reaction, Partials.User],
 });
 
-const context = { store, log, client, env };
+const context = { store, log, client, env, dataset };
 
 for (const event of events) {
   const handler = (...args) =>

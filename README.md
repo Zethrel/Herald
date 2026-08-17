@@ -68,11 +68,17 @@ needs editing.
 | `/config behaviour ...` | Exclusive ranks on/off, default-rank-removal on/off. |
 | `/config view` | The current configuration. |
 | `/rank backfill [confirm]` | Gives the default rank to members who have **no** rank at all. Reports and does nothing without `confirm:true`. |
+| `/consumables spec <spec>` | Flask, food and potion for one spec, with where the answer came from. |
+| `/consumables shopping <roster> [flasks] [food] [potions]` | Rolls a roster up into consumables, crafts and reagents. |
+| `/consumables tier` | Which tier the data is for, how complete it is, what is still missing. |
+| `/consumables set\|clear` | Override a slot for a spec on this server (Manage Server). |
 | `/guilds list\|approve\|revoke\|leave` | The server allowlist. Bot owners only — see below. |
 | `/about` | What the bot does. |
 
-Everything except `/about` requires **Manage Server**; `/guilds` additionally
-refuses anyone who is not in `OWNER_IDS`.
+`/about` and `/consumables` are open to everyone — raiders need to look up their
+own flask. `/consumables set` and `clear` check **Manage Server** in code. Every
+other command requires **Manage Server**, and `/guilds` additionally refuses
+anyone who is not in `OWNER_IDS`.
 
 ### Setup is additive, and safe to re-run
 
@@ -88,6 +94,67 @@ it did not make, and it never changes a member's roles.
 
 If your ranks are named something else entirely, bind them by hand with
 `/config rank` and then run setup — it will keep those bindings.
+
+## Consumables
+
+```
+/consumables spec fire mage
+  Flask     — Flask of <x> (wowhead)
+  Food buff — <x>
+  Potion    — <x>            (intellect default)
+  Tier: <tier> · Source: <link>
+
+/consumables shopping roster:"4x fire mage, 2 holy priest, 3 prot warr" flasks:2
+  Consumables   18× Flask of <x>, 36× <food>, …
+  Crafts         9× Flask of <x> (yields 2, 1 spare)
+  Reagents      27× <herb>, 9× <herb>
+```
+
+The roster parser takes what people actually type — `4x fire mage`, `2 holy
+priest`, `boomkin`, `ww monk`, `prot warr` — and the spec option has type-ahead.
+Anything it cannot read comes back in the reply rather than being silently
+dropped, and anything ambiguous is refused outright: `frost` is a Mage and a
+Death Knight, and guessing puts the wrong flask in someone's bags.
+
+The crafting maths is the part worth trusting it for. Recipes yield more than
+one flask per craft, so reagents are counted by whole crafts: 9 flasks from a
+recipe that yields 2 is 5 crafts, 15 of the first herb, and one flask spare.
+
+### Where the answers come from
+
+**Herald does not know what the current tier wants, and does not pretend to.**
+Everything above is driven by [`tiers/current.json`](tiers/current.json), which
+ships empty. An unfilled slot renders as *not set for this tier* — never as a
+plausible-looking guess, because a guessed reagent list costs real gold.
+
+The file has four parts:
+
+| Key | What it holds |
+| --- | --- |
+| `items` | slug → name, item id (drives the Wowhead links) |
+| `recipes` | slug → profession, yield, reagents. This is what makes the shopping list possible |
+| `defaults` | per primary stat (`intellect`, `agility`, `strength`) and per role (`healer`, `tank`) |
+| `specs` | per spec, when a spec departs from its stat's default |
+
+Answers resolve in that order, most specific first: **this server's override →
+the spec's own entry → its primary stat → its role.** So one `intellect` entry
+answers for all nineteen intellect specs, and you only write a spec entry where
+a spec actually differs. `/consumables spec` says which of those a given answer
+came from, so a raider can see when they are reading a class-wide default rather
+than something set for them.
+
+Provenance is part of the format, not decoration. `updatedAt` and `sources`
+drive a staleness warning after `staleAfterDays` (90 by default), and undated
+data counts as stale — "we don't know when this was written" is not reassuring
+the night before a progression pull. `/consumables tier` reports coverage and
+lists what is still unanswered.
+
+Officers can also fix one spec without touching the file: `/consumables set spec:fire mage
+slot:flask item:... source:...` overrides it for that server only, and
+`/consumables clear` puts it back.
+
+The file is read once at startup, so editing it means a restart — the same cost
+as editing `.env`.
 
 ## Approved servers
 
@@ -153,7 +220,7 @@ It refuses to start without `OWNER_IDS`: a bot that cannot tell anyone about an
 unapproved invite is worse than one that will not boot.
 
 ```sh
-npm test                  # 73 tests, no network needed
+npm test                  # 100 tests, no network needed
 ```
 
 ### Discord Developer Portal
@@ -191,6 +258,8 @@ src/
 ├── blueprint.js       what a set-up server looks like — pure data
 ├── store.js           per-server settings and the allowlist, JSON on disk
 ├── access/            which servers may run the bot, and telling you when one may not
+├── consumables/       the tier file, spec resolution and the shopping list (pure)
+├── game/              the class and specialisation catalogue — data
 ├── plan/              diff the blueprint against a live server (pure)
 ├── apply/             execute the diff
 ├── ranks/             who gets which rank, and when (pure)
