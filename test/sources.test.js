@@ -25,55 +25,69 @@ function datasetWith(reports, extra = {}) {
 const report = (specs, fetchedAt = '2026-08-01T00:00:00Z') => ({ fetchedAt, specs });
 
 describe('the source registry', () => {
-  it('knows the three guides and the guild itself', () => {
-    assert.deepEqual(SOURCE_IDS, ['icy-veins', 'wowhead', 'method', 'guild']);
-    assert.equal(sourceName('icy-veins'), 'Icy Veins');
+  it('follows Method, plus the guild itself', () => {
+    // Icy Veins and Wowhead mint a new URL every tier, so there is no stable
+    // page to follow and they are not tracked.
+    assert.deepEqual(SOURCE_IDS, ['method', 'guild']);
+    assert.equal(sourceName('method'), 'Method');
     assert.equal(sourceById('method').homepage, 'https://www.method.gg/');
     assert.equal(sourceName('nonsense'), 'nonsense');
+  });
+
+  it('ignores a report from a source it does not track', () => {
+    const dataset = datasetWith({
+      'some-old-site': report({ 'mage.fire': { flask: 'flask-b' } }),
+      method: report({ 'mage.fire': { flask: 'flask-a' } }),
+    });
+
+    const { sources, slots } = compareSpec({ dataset, spec: FIRE });
+
+    assert.deepEqual(sources, ['method']);
+    assert.equal(slots.flask.consensus.name, 'Flask A');
   });
 });
 
 describe('mergeReports', () => {
   it("layers a server's recorded reports over the shipped ones", () => {
     const merged = mergeReports(
-      { 'icy-veins': report({ 'mage.fire': { flask: 'flask-a' } }) },
-      { 'icy-veins': { specs: { 'mage.fire': { flask: 'flask-b' } } } },
+      { method: report({ 'mage.fire': { flask: 'flask-a' } }) },
+      { method: { specs: { 'mage.fire': { flask: 'flask-b' } } } },
     );
 
-    assert.equal(merged['icy-veins'].specs['mage.fire'].flask, 'flask-b');
+    assert.equal(merged.method.specs['mage.fire'].flask, 'flask-b');
   });
 
   it('keeps specs the overlay does not mention', () => {
     const merged = mergeReports(
       {
-        'icy-veins': report({
+        method: report({
           'mage.fire': { flask: 'flask-a' },
           'priest.holy': { flask: 'flask-c' },
         }),
       },
-      { 'icy-veins': { specs: { 'mage.fire': { flask: 'flask-b' } } } },
+      { method: { specs: { 'mage.fire': { flask: 'flask-b' } } } },
     );
 
-    assert.equal(merged['icy-veins'].specs['priest.holy'].flask, 'flask-c');
+    assert.equal(merged.method.specs['priest.holy'].flask, 'flask-c');
   });
 
   it('merges slot by slot rather than replacing a spec entry', () => {
     const merged = mergeReports(
-      { wowhead: report({ 'mage.fire': { flask: 'flask-a', food: 'feast-a' } }) },
-      { wowhead: { specs: { 'mage.fire': { flask: 'flask-b' } } } },
+      { method: report({ 'mage.fire': { flask: 'flask-a', food: 'feast-a' } }) },
+      { method: { specs: { 'mage.fire': { flask: 'flask-b' } } } },
     );
 
-    assert.equal(merged.wowhead.specs['mage.fire'].flask, 'flask-b');
-    assert.equal(merged.wowhead.specs['mage.fire'].food, 'feast-a');
+    assert.equal(merged.method.specs['mage.fire'].flask, 'flask-b');
+    assert.equal(merged.method.specs['mage.fire'].food, 'feast-a');
   });
 
   it('takes a source that only one side has', () => {
     const merged = mergeReports(
-      { 'icy-veins': report({ 'mage.fire': { flask: 'flask-a' } }) },
-      { method: { specs: { 'mage.fire': { flask: 'flask-b' } } } },
+      { method: report({ 'mage.fire': { flask: 'flask-a' } }) },
+      { guild: { specs: { 'mage.fire': { flask: 'flask-b' } } } },
     );
 
-    assert.deepEqual(Object.keys(merged).sort(), ['icy-veins', 'method']);
+    assert.deepEqual(Object.keys(merged).sort(), ['guild', 'method']);
   });
 });
 
@@ -81,7 +95,7 @@ describe('tally', () => {
   const opinion = (sourceId, name) => ({ sourceId, item: { slug: name, name } });
 
   it('calls a single answer single, not unanimous', () => {
-    assert.equal(tally([opinion('wowhead', 'flask-a')]).agreement, 'single');
+    assert.equal(tally([opinion('method', 'flask-a')]).agreement, 'single');
   });
 
   it('calls it unanimous when everyone says the same', () => {
@@ -135,34 +149,49 @@ describe('tally', () => {
 
 describe('compareSpec', () => {
   const dataset = datasetWith({
-    'icy-veins': report({ 'mage.fire': { flask: 'flask-a', food: 'feast-a', url: 'https://iv.invalid/fire' } }),
-    wowhead: report({ 'mage.fire': { flask: 'flask-b' } }),
-    method: report({ 'mage.fire': { flask: 'flask-a' } }),
+    method: report({
+      'mage.fire': { flask: 'flask-a', food: 'feast-a', url: 'https://www.method.gg/guides/fire-mage/x' },
+    }),
   });
 
-  it('lists every guide with its attribution', () => {
+  it("lists Method's answer with its attribution", () => {
     const { slots, sources } = compareSpec({ dataset, spec: FIRE });
 
-    assert.deepEqual(sources, ['icy-veins', 'wowhead', 'method']);
-    const flask = slots.flask;
-    assert.equal(flask.opinions.length, 3);
-    assert.equal(flask.opinions[0].name, 'Icy Veins');
-    assert.equal(flask.opinions[0].url, 'https://iv.invalid/fire');
-    assert.equal(flask.opinions[0].fetchedAt, '2026-08-01T00:00:00Z');
+    assert.deepEqual(sources, ['method']);
+    assert.equal(slots.flask.opinions.length, 1);
+    assert.equal(slots.flask.opinions[0].name, 'Method');
+    assert.equal(slots.flask.opinions[0].url, 'https://www.method.gg/guides/fire-mage/x');
+    assert.equal(slots.flask.opinions[0].fetchedAt, '2026-08-01T00:00:00Z');
   });
 
-  it('resolves the majority across guides', () => {
+  it('takes a lone answer as the answer', () => {
+    // With one guide tracked, "single" is the normal case rather than a
+    // degenerate one -- it still resolves.
     const { slots } = compareSpec({ dataset, spec: FIRE });
 
-    assert.equal(slots.flask.agreement, 'majority');
+    assert.equal(slots.flask.agreement, 'single');
     assert.equal(slots.flask.consensus.name, 'Flask A');
   });
 
-  it('reports a slot only one guide covers', () => {
-    const { slots } = compareSpec({ dataset, spec: FIRE });
+  it('agrees with itself when the guild records the same answer', () => {
+    const agreed = datasetWith({
+      method: report({ 'mage.fire': { flask: 'flask-a' } }),
+      guild: report({ 'mage.fire': { flask: 'flask-a' } }),
+    });
 
-    assert.equal(slots.food.agreement, 'single');
-    assert.equal(slots.food.opinions.length, 1);
+    assert.equal(compareSpec({ dataset: agreed, spec: FIRE }).slots.flask.agreement, 'unanimous');
+  });
+
+  it('shows a guild disagreement as a split rather than picking a side', () => {
+    const disputed = datasetWith({
+      method: report({ 'mage.fire': { flask: 'flask-a' } }),
+      guild: report({ 'mage.fire': { flask: 'flask-b' } }),
+    });
+
+    const { slots } = compareSpec({ dataset: disputed, spec: FIRE });
+
+    assert.equal(slots.flask.agreement, 'split');
+    assert.equal(slots.flask.consensus, null);
   });
 
   it('reports a slot nobody covers', () => {
@@ -172,41 +201,34 @@ describe('compareSpec', () => {
     assert.deepEqual(slots.potion.opinions, []);
   });
 
-  it('has nothing to say about a spec no guide mentions', () => {
+  it('has nothing to say about a spec the guide does not mention', () => {
     const { sources } = compareSpec({ dataset, spec: specByKey('rogue.outlaw') });
     assert.deepEqual(sources, []);
   });
 });
 
 describe('consensusFor', () => {
-  it('offers an answer where the guides agree', () => {
-    const dataset = datasetWith({
-      'icy-veins': report({ 'mage.fire': { flask: 'flask-a' } }),
-      method: report({ 'mage.fire': { flask: 'flask-a' } }),
-    });
-
+  it("offers Method's answer", () => {
+    const dataset = datasetWith({ method: report({ 'mage.fire': { flask: 'flask-a' } }) });
     const consensus = consensusFor({ dataset, spec: FIRE });
 
     assert.equal(consensus.flask.item.name, 'Flask A');
-    assert.equal(consensus.flask.agreement, 'unanimous');
-    assert.deepEqual(consensus.flask.sourceIds, ['icy-veins', 'method']);
+    assert.equal(consensus.flask.agreement, 'single');
+    assert.deepEqual(consensus.flask.sourceIds, ['method']);
   });
 
-  it('offers nothing where they split', () => {
+  it('offers nothing where the guild has recorded a disagreement', () => {
     const dataset = datasetWith({
-      'icy-veins': report({ 'mage.fire': { flask: 'flask-a' } }),
-      method: report({ 'mage.fire': { flask: 'flask-b' } }),
+      method: report({ 'mage.fire': { flask: 'flask-a' } }),
+      guild: report({ 'mage.fire': { flask: 'flask-b' } }),
     });
 
     assert.deepEqual(consensusFor({ dataset, spec: FIRE }), {});
   });
 });
 
-describe('the guides in the resolution chain', () => {
-  const reports = {
-    'icy-veins': report({ 'mage.fire': { flask: 'flask-a' } }),
-    method: report({ 'mage.fire': { flask: 'flask-a' } }),
-  };
+describe('Method in the resolution chain', () => {
+  const reports = { method: report({ 'mage.fire': { flask: 'flask-a' } }) };
 
   it('beats the generic stat default', () => {
     // A guide that looked at this exact spec is better than "all intellect
@@ -216,7 +238,7 @@ describe('the guides in the resolution chain', () => {
 
     assert.equal(resolved.slots.flask.item.name, 'Flask A');
     assert.equal(resolved.slots.flask.via, 'sources');
-    assert.deepEqual(resolved.slots.flask.sourceIds, ['icy-veins', 'method']);
+    assert.deepEqual(resolved.slots.flask.sourceIds, ['method']);
   });
 
   it("never beats the tier file's own entry for the spec", () => {
@@ -239,11 +261,13 @@ describe('the guides in the resolution chain', () => {
     assert.equal(resolved.slots.flask.via, 'guild');
   });
 
-  it('falls through to the defaults when the guides disagree', () => {
+  it('falls through to the defaults when a recorded guild view disagrees', () => {
+    // Recording a disagreement marks it; it does not decide it. Deciding is
+    // what /consumables set is for, and that outranks everything.
     const dataset = datasetWith(
       {
-        'icy-veins': report({ 'mage.fire': { flask: 'flask-a' } }),
-        method: report({ 'mage.fire': { flask: 'flask-b' } }),
+        method: report({ 'mage.fire': { flask: 'flask-a' } }),
+        guild: report({ 'mage.fire': { flask: 'flask-b' } }),
       },
       { defaults: { intellect: { flask: 'flask-c' } } },
     );
@@ -254,10 +278,10 @@ describe('the guides in the resolution chain', () => {
     assert.equal(resolved.slots.flask.via, 'default:intellect');
   });
 
-  it('leaves the slot empty when the guides disagree and nothing else answers', () => {
+  it('leaves the slot empty when nothing else answers either', () => {
     const dataset = datasetWith({
-      'icy-veins': report({ 'mage.fire': { flask: 'flask-a' } }),
-      method: report({ 'mage.fire': { flask: 'flask-b' } }),
+      method: report({ 'mage.fire': { flask: 'flask-a' } }),
+      guild: report({ 'mage.fire': { flask: 'flask-b' } }),
     });
 
     const resolved = resolveSpecConsumables({ spec: FIRE, dataset });
@@ -266,12 +290,12 @@ describe('the guides in the resolution chain', () => {
     assert.equal(resolved.slots.flask.via, null);
   });
 
-  it("uses a server's recorded reports when they are passed in", () => {
+  it("uses a server's recorded report when one is passed in", () => {
     const dataset = datasetWith({});
     const resolved = resolveSpecConsumables({
       spec: FIRE,
       dataset,
-      reports: mergeReports({}, { wowhead: { specs: { 'mage.fire': { flask: 'flask-b' } } } }),
+      reports: mergeReports({}, { method: { specs: { 'mage.fire': { flask: 'flask-b' } } } }),
     });
 
     assert.equal(resolved.slots.flask.item.name, 'Flask B');
@@ -280,13 +304,13 @@ describe('the guides in the resolution chain', () => {
 });
 
 describe('disagreements', () => {
-  it('finds every spec the guides split on', () => {
+  it('finds every spec where a recorded guild view differs from the guide', () => {
     const dataset = datasetWith({
-      'icy-veins': report({
+      method: report({
         'mage.fire': { flask: 'flask-a' },
         'priest.holy': { flask: 'flask-a' },
       }),
-      method: report({
+      guild: report({
         'mage.fire': { flask: 'flask-b' },
         'priest.holy': { flask: 'flask-a' },
       }),

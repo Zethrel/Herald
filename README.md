@@ -80,7 +80,7 @@ needs editing.
 | `/consumables spec <spec>` | Flask, food and potion for one spec, with where the answer came from. |
 | `/consumables shopping [roster] [raid] [flasks] [food] [potions]` | Rolls a roster up into consumables, crafts and reagents. |
 | `/consumables tier` | Which tier the data is for, how complete it is, what is still missing. |
-| `/consumables compare [spec]` | What Icy Veins, Wowhead and Method each say — or every spec they disagree on. |
+| `/consumables compare [spec]` | What Method says, against the guild's own call. |
 | `/consumables report <source> <spec> <slot> <item>` | Record what one guide says (Manage Server). |
 | `/consumables set\|clear` | Override a slot for a spec on this server (Manage Server). |
 | `/guilds list\|approve\|revoke\|leave` | The server allowlist. Bot owners only — see below. |
@@ -242,13 +242,13 @@ The file has four parts:
 | Key | What it holds |
 | --- | --- |
 | `items` | slug → name, item id (drives the Wowhead links) |
-| `reports` | what each guide says, per source — see *Comparing the guides* |
+| `reports` | what Method says, per spec — see *What Method says* |
 | `recipes` | slug → profession, yield, reagents. This is what makes the shopping list possible |
 | `defaults` | per primary stat (`intellect`, `agility`, `strength`) and per role (`healer`, `tank`) |
 | `specs` | per spec, when a spec departs from its stat's default |
 
 Answers resolve most specific first: **this server's override → the spec's own
-entry → what the guides agree on → its primary stat → its role.** So one
+entry → what Method says → its primary stat → its role.** So one
 `intellect` entry answers for all nineteen intellect specs, and you only write a
 spec entry where a spec actually differs. `/consumables spec` says which of
 those a given answer came from, so a raider can see when they are reading a
@@ -264,77 +264,77 @@ Officers can also fix one spec without touching the file: `/consumables set spec
 slot:flask item:... source:...` overrides it for that server only, and
 `/consumables clear` puts it back.
 
-### Comparing the guides
+### What Method says
 
-Herald tracks what [Icy Veins](https://www.icy-veins.com/),
-[Wowhead](https://www.wowhead.com/) and [Method](https://www.method.gg/) each
-recommend, per spec, per slot — plus a fourth "source" for the guild's own call,
-so a decision that departs from all three is visible rather than silent.
+Herald follows one guide: [Method](https://www.method.gg/). Icy Veins and
+Wowhead were considered and dropped, and the reason is recorded in
+`src/sources/registry.js` so nobody re-litigates it: both mint a **new URL every
+tier**, so there is no stable page to follow. A source needs a durable address
+before it can be tracked by pattern — Method's `/guides/<spec>-<class>/` has
+one, theirs do not.
 
 ```
 /consumables compare spec:fire mage
-  Flask     — ➗ majority
-    Icy Veins: Flask of <x> (source) · 3 days ago
-    Wowhead:   Flask of <x> (source) · 3 days ago
-    Method:    Flask of <y> (source) · 3 days ago
-  Food buff — ⚠️ they disagree
-    …
+  Method · read the guide
 
-/consumables compare          → every spec the guides split on
+  Flask     — ℹ️ only one source
+    Method: Flask of <x> (source) · 3 days ago
+  Food buff — ⚠️ they disagree
+    Method:      <x> (source)
+    Our own call: <y>
+  Combat potion — nobody has said
+
+/consumables compare          → every spec where the guild differs from Method
 ```
 
-**Where they agree, Herald uses it** — it sits above the generic stat defaults
-in the chain, since a guide that looked at this exact spec beats "all intellect
-casters use X", and below anything a person wrote deliberately.
+Alongside Method there is a second "source": **the guild's own call**. It exists
+so that a decision to depart from the guide is *visible* rather than silent —
+`/consumables compare` with no spec lists exactly where the two differ.
 
-**Where they disagree, Herald picks nothing** and falls through to the tier
-file. A split is the information: it means the choice is close, or the tier
-moved, or one guide is stale. Two against two is not a recommendation, and
-resolving it into a single confident answer would be a coin toss dressed up as
-advice. A clear majority is used but labelled as one.
+**Where Method is the only voice, Herald uses it.** It sits above the generic
+stat defaults in the chain, since a guide that looked at this exact spec beats
+"all intellect casters use X", and below anything a person wrote deliberately.
 
-Every quoted line keeps the source's name, the page URL and when it was read.
-These are other people's editorial judgements; Herald repeats them with
-attribution, it does not absorb them.
+**Where a recorded guild view contradicts it, Herald picks neither** and falls
+through to the tier file's own defaults. Recording a disagreement *marks* it; it
+does not decide it. To actually decide, use `/consumables set` — that is an
+override and outranks everything.
 
-### Getting the guides in
+Every quoted line keeps Method's name, the page URL and when it was read. This
+is someone else's editorial judgement; Herald repeats it with attribution rather
+than absorbing it.
 
-`/consumables report source:icy-veins spec:fire mage slot:flask item:"…" url:…`
-records one guide's answer for one spec, on one server. That works today and
-needs nothing external.
+### Getting it in
 
-For anything bulk, fill the `reports` section of the tier file — the shape is in
-[`tiers/example.json`](tiers/example.json), which shows three guides on one
-spec, two agreeing and one not.
+`/consumables report source:method spec:fire mage slot:flask item:"…" url:…`
+records one answer for one spec, on one server. That works today and needs
+nothing external. For bulk, fill the `reports` section of the tier file — the
+shape is in [`tiers/example.json`](tiers/example.json).
 
-**Guide links are derived where the pattern is known.** Method organises its
-pages as `method.gg/guides/<spec>-<class>/stats-races-and-consumables`, so
-`/consumables compare` links straight to the right page for all 39 specs.
-Deriving those is safe in a way guessing selectors is not: a wrong URL 404s
-loudly and is fixed with one line, while a wrong selector returns the wrong
-flask and says nothing.
+**Guide links are derived from the pattern.** Method organises its pages as
+`method.gg/guides/<spec>-<class>/stats-races-and-consumables`, so
+`/consumables compare` links straight to the right page for all 39 specs, whether
+or not anyone has recorded an answer yet. Deriving those is safe in a way
+guessing selectors is not: a wrong URL 404s loudly and is fixed with one line in
+`METHOD_OVERRIDES`, while a wrong selector returns the wrong flask and says
+nothing.
 
-Four of the slugs were checked by hand against the live site; the rest follow
-the pattern and are shown as *unverified link* until `npm run check-guides`
-says otherwise. That script requests each URL once, a second apart, reads no
-page content, and prints the confirmed slugs to paste back — plus any 404s that
-need an entry in `METHOD_OVERRIDES`. It distinguishes a 404 (the slug is wrong)
-from a 403 or 5xx (the network is in the way), because turning a proxy block
-into a list of "corrections" would be worse than no answer at all.
+Four slugs were checked by hand; the rest follow the pattern and render as
+*unverified link* until `npm run check-guides` says otherwise. That script
+requests each URL once, a second apart, reads no page content, and prints the
+confirmed slugs to paste back plus any 404s needing an override. It separates a
+404 (the slug is wrong) from a 403 or 5xx (the network is in the way) and stops
+outright when nothing gets through — turning a proxy block into a list of
+"corrections" would be worse than no answer.
 
-Icy Veins and Wowhead organise their guides differently and neither pattern has
-been checked, so neither is guessed at — those show *no link on file* until
-someone confirms the shape.
-
-**There is still no scraper, deliberately.** Automating this needs per-site HTML
-selectors, and those can only be written against the real pages and re-verified
-every time a site reworks its guide templates — which all three do between
-tiers. Selectors written blind would look right, break silently mid-tier, and be
-discovered on raid night, which is the same failure mode this whole file exists
-to avoid. If you want it automated, the honest path is a small fetcher per site
-written and checked against live markup, run on a schedule, writing into
-`reports` exactly as the manual command does — everything downstream of that
-point already works.
+**There is still no scraper, deliberately.** Reading the recommendation off the
+page needs HTML selectors, and those can only be written against real markup and
+re-verified whenever Method reworks its templates. Selectors written blind would
+look right, break silently mid-tier, and be discovered on raid night — the exact
+failure this file exists to prevent. When it is worth automating, the honest
+path is a small fetcher checked against a live page, writing into `reports`
+exactly as the manual command does; everything downstream of that point already
+works.
 
 The file is read once at startup, so editing it means a restart — the same cost
 as editing `.env`. [`tiers/example.json`](tiers/example.json) shows the shape
@@ -468,7 +468,7 @@ It refuses to start without `OWNER_IDS`: a bot that cannot tell anyone about an
 unapproved invite is worse than one that will not boot.
 
 ```sh
-npm test                  # 253 tests, no network needed
+npm test                  # 255 tests, no network needed
 ```
 
 ### Discord Developer Portal

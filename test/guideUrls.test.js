@@ -67,8 +67,8 @@ describe('isConfirmed', () => {
     assert.equal(METHOD_CONFIRMED.size, 4);
   });
 
-  it('claims nothing for the guides whose pattern is unknown', () => {
-    assert.equal(isConfirmed('icy-veins', specByKey('deathknight.blood')), false);
+  it('claims nothing for a source with no pattern', () => {
+    assert.equal(isConfirmed('guild', specByKey('deathknight.blood')), false);
   });
 });
 
@@ -77,11 +77,7 @@ describe('guideUrl', () => {
     assert.match(guideUrl('method', specByKey('mage.fire')), /method\.gg/);
   });
 
-  it('offers nothing for the guides whose pattern has not been checked', () => {
-    // Better no link than one that might 404: these two organise their guides
-    // differently and neither pattern has been verified.
-    assert.equal(guideUrl('icy-veins', specByKey('mage.fire')), null);
-    assert.equal(guideUrl('wowhead', specByKey('mage.fire')), null);
+  it("offers nothing for the guild's own call, which has no page", () => {
     assert.equal(guideUrl('guild', specByKey('mage.fire')), null);
   });
 

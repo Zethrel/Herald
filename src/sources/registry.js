@@ -5,17 +5,11 @@
 // presented as Herald's own advice. That is the difference between quoting a
 // guide and laundering it.
 
+// Icy Veins and Wowhead were considered and dropped, and the reason is worth
+// keeping: both mint a new URL for every tier, so there is no stable page to
+// follow. A source has to have a durable address before anything can track it
+// by pattern -- Method's /guides/<spec>-<class>/ does, theirs does not.
 export const SOURCES = [
-  {
-    id: 'icy-veins',
-    name: 'Icy Veins',
-    homepage: 'https://www.icy-veins.com/',
-  },
-  {
-    id: 'wowhead',
-    name: 'Wowhead',
-    homepage: 'https://www.wowhead.com/',
-  },
   {
     id: 'method',
     name: 'Method',

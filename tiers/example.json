@@ -1,5 +1,5 @@
 {
-  "_comment": "An illustrative tier file. The item names here are invented \u2014 this file exists to show the format, not to be used. Copy the shape into current.json, put real names in, and run `npm run sync-tier` to fill in the ids, yields and reagents from Blizzard's API. The `reports` section shows three guides on one spec, two agreeing and one not: that is a majority, so Herald would use it but say so \u2014 and a two-two split would resolve to nothing at all.",
+  "_comment": "An illustrative tier file. The item names here are invented \u2014 this file exists to show the format, not to be used. Copy the shape into current.json, put real names in, and run `npm run sync-tier` to fill in the ids, yields and reagents from Blizzard's API. The `reports` section shows Method's answer for one spec plus a recorded guild view that differs: /consumables compare shows the disagreement, and because the two cancel out the flask falls through to the intellect default. Recording a disagreement marks it \u2014 use /consumables set to actually decide it.",
   "schema": 1,
   "tier": {
     "name": "Example Raid",
@@ -110,32 +110,22 @@
     }
   },
   "reports": {
-    "icy-veins": {
+    "method": {
       "fetchedAt": "2026-01-01T00:00:00Z",
       "specs": {
         "mage.fire": {
           "flask": "flask-of-example-intellect",
           "food": "example-feast",
           "potion": "potion-of-example-power",
-          "url": "https://example.invalid/icy-veins/fire-mage"
+          "url": "https://www.method.gg/guides/fire-mage/stats-races-and-consumables"
         }
       }
     },
-    "wowhead": {
-      "fetchedAt": "2026-01-01T00:00:00Z",
+    "guild": {
+      "fetchedAt": "2026-01-02T00:00:00Z",
       "specs": {
         "mage.fire": {
-          "flask": "flask-of-example-intellect",
-          "url": "https://example.invalid/wowhead/fire-mage"
-        }
-      }
-    },
-    "method": {
-      "fetchedAt": "2026-01-01T00:00:00Z",
-      "specs": {
-        "mage.fire": {
-          "flask": "flask-of-example-intellect-alt",
-          "url": "https://example.invalid/method/fire-mage"
+          "flask": "flask-of-example-intellect-alt"
         }
       }
     }

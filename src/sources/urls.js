@@ -51,17 +51,14 @@ export function methodGuideUrl(spec) {
   return `${METHOD_BASE}/${methodSlug(spec)}/${METHOD_PAGE}`;
 }
 
-// --- The others ----------------------------------------------------------------
+// --- The rest ------------------------------------------------------------------
 //
-// Icy Veins and Wowhead both organise their guides differently again, and
-// neither pattern has been checked, so neither is guessed at here. A spec with
-// no known URL simply has none -- `/consumables compare` says "no link on file"
-// rather than offering one that might 404.
+// Only Method is followed by pattern, because only Method keeps one address per
+// spec across tiers. The guild's own call has no page to link to, and any
+// source added later needs a builder here or it simply has no link.
 
 const BUILDERS = {
   method: methodGuideUrl,
-  'icy-veins': () => null,
-  wowhead: () => null,
   guild: () => null,
 };
 
