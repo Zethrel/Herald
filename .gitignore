@@ -1,0 +1,7 @@
+node_modules/
+
+# The bot token lives here.
+.env
+
+# Per-server settings: runtime state, not source.
+data/

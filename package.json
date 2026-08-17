@@ -1,0 +1,19 @@
+{
+  "name": "herald",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Discord bot for World of Warcraft raiding guilds: server setup, default rank on join, and a self-serve Social/Raider landing page.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env src/index.js",
+    "deploy": "node --env-file-if-exists=.env src/deploy-commands.js",
+    "test": "node --test \"test/*.test.js\""
+  },
+  "license": "MIT",
+  "dependencies": {
+    "discord.js": "^14.27.0"
+  }
+}
