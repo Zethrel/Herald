@@ -10,6 +10,7 @@ import { BRAND_COLOR, FOOTER } from '../branding.js';
 import { SLOTS, SLOT_LABELS, coverage, isStale } from '../consumables/dataset.js';
 import { SPECS, SPEC_KEYS, findSpec, specByKey } from '../game/specs.js';
 import { DEFAULT_PER_RAIDER, buildShoppingList, parseRoster } from '../consumables/shopping.js';
+import { formatMoney, priceLines } from '../prices/auctions.js';
 import { gaps, resolveSpecConsumables } from '../consumables/resolve.js';
 
 export const data = new SlashCommandBuilder()
@@ -97,13 +98,13 @@ export async function autocomplete(interaction) {
   );
 }
 
-export async function execute(interaction, { store, dataset, log }) {
+export async function execute(interaction, { store, dataset, prices, log }) {
   const sub = interaction.options.getSubcommand();
   const config = await store.get(interaction.guildId);
   const overrides = config.consumables?.overrides ?? {};
 
   if (sub === 'tier') return showTier(interaction, { dataset, overrides });
-  if (sub === 'shopping') return showShopping(interaction, { dataset, overrides });
+  if (sub === 'shopping') return showShopping(interaction, { dataset, overrides, prices });
 
   const spec = resolveSpecOption(interaction.options.getString('spec'));
   if (!spec) {
@@ -272,7 +273,7 @@ function showTier(interaction, { dataset, overrides }) {
   return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 }
 
-function showShopping(interaction, { dataset, overrides }) {
+async function showShopping(interaction, { dataset, overrides, prices }) {
   const { entries, unknown } = parseRoster(interaction.options.getString('roster'), { findSpec });
 
   if (entries.length === 0) {
@@ -345,5 +346,64 @@ function showShopping(interaction, { dataset, overrides }) {
     embed.addFields({ name: 'Not understood', value: unknown.join(', ') });
   }
 
-  return interaction.reply({ embeds: [embed] });
+  // Everything above is arithmetic on the tier file and answers instantly.
+  // Pricing may have to pull the commodity feed, so the reply is deferred only
+  // when prices are actually going to be attempted.
+  const shoppable = [...list.reagents, ...list.buy];
+  if (!prices?.available || shoppable.length === 0) {
+    return interaction.reply({ embeds: [embed] });
+  }
+
+  await interaction.deferReply();
+  await addPrices(embed, { list: shoppable, dataset, prices });
+  return interaction.editReply({ embeds: [embed] });
+}
+
+async function addPrices(embed, { list, dataset, prices }) {
+  const itemIds = list.map((line) => (line.slug ? dataset.items?.[line.slug]?.itemId : null)).filter(Boolean);
+  const snapshot = await prices.prices(itemIds);
+  if (!snapshot) return;
+
+  const { priced, unpriced, total, complete } = priceLines({ lines: list, dataset, books: snapshot.books });
+  if (priced.length === 0) return;
+
+  const top = priced
+    .slice(0, 8)
+    .map(
+      (line) =>
+        `${formatMoney(line.total)} — **${line.quantity}×** ${line.name}${
+          line.short > 0 ? ` _(only ${line.available} listed)_` : ''
+        }`,
+    )
+    .join('\n');
+
+  embed.addFields({
+    name: complete ? 'Cost at current prices' : 'Cost at current prices (partial)',
+    value: [
+      `**${formatMoney(total)}**${complete ? '' : ' — at least; see below'}`,
+      '',
+      top,
+      priced.length > 8 ? `…and ${priced.length - 8} more` : '',
+    ]
+      .filter(Boolean)
+      .join('\n')
+      .slice(0, 1024),
+  });
+
+  const caveats = [];
+  if (unpriced.length > 0) {
+    caveats.push(`Not priced: ${unpriced.map((line) => line.name).join(', ')}`);
+  }
+  if (priced.some((line) => line.short > 0)) {
+    caveats.push('Some items are not listed in the quantity you need — the total is a floor.');
+  }
+
+  embed.addFields({
+    name: 'Prices',
+    value: [
+      `Region-wide commodities, snapshot **${snapshot.age.text}**.`,
+      'Blizzard regenerates this hourly at 20 past, so it will not move before then.',
+      ...caveats,
+    ].join('\n'),
+  });
 }

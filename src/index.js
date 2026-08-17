@@ -4,6 +4,7 @@ import { createLogger } from './logger.js';
 import { createStore } from './store.js';
 import { events } from './events/index.js';
 import { loadDataset } from './consumables/dataset.js';
+import { priceServiceFromEnv } from './prices/service.js';
 import { readEnv } from './env.js';
 
 const env = readEnv();
@@ -33,7 +34,14 @@ const client = new Client({
   partials: [Partials.Message, Partials.Channel, Partials.Reaction, Partials.User],
 });
 
-const context = { store, log, client, env, dataset };
+const prices = priceServiceFromEnv({ env, log });
+log.info(
+  prices.available
+    ? `Commodity prices enabled (${env.blizzard.region.toUpperCase()}), refreshed hourly at 20 past`
+    : 'Commodity prices disabled — set BLIZZARD_CLIENT_ID and BLIZZARD_CLIENT_SECRET to turn them on',
+);
+
+const context = { store, log, client, env, dataset, prices };
 
 for (const event of events) {
   const handler = (...args) =>

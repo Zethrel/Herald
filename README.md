@@ -185,8 +185,41 @@ someone back to the auction house mid-raid.
 
 Credentials are free — create a client at
 [develop.battle.net](https://develop.battle.net) and put `BLIZZARD_CLIENT_ID`
-and `BLIZZARD_CLIENT_SECRET` in `.env`. They are used by this script only; the
-running bot never talks to Blizzard.
+and `BLIZZARD_CLIENT_SECRET` in `.env`.
+
+### What it costs
+
+With those credentials set, `/consumables shopping` also prices itself off the
+**region-wide commodity auction house** — which is where every flask, potion,
+feast and herb is sold, so there is no realm to configure.
+
+```
+Cost at current prices
+  84,120g 00s
+  31,500g — 630× <herb>
+  22,400g — 280× <herb>
+  …
+Prices
+  Region-wide commodities, snapshot 37 min ago.
+```
+
+The quoted price is what buying that quantity actually costs, walked up the
+order book — not the cheapest listing, which is a lie the moment it is a single
+unit with the next thousand at triple. When the auction house cannot supply the
+quantity, the total is labelled a floor and the line says how many are listed.
+
+**Blizzard regenerates this data hourly, at 20 minutes past.** The bot knows
+that: it fetches at most once per refresh and caches until 25 past the next
+hour, so a second `/consumables shopping` in the same hour is free, and the age
+shown next to the total comes from the snapshot's own `Last-Modified` rather
+than from a guess. Concurrent callers share one download — the feed is tens of
+megabytes.
+
+If you schedule `sync-tier`, run it at `25 * * * *` for the same reason: after
+the refresh has landed, not on top of it.
+
+Without credentials none of this exists and nothing else changes — no errors, no
+degraded commands, just no prices.
 
 ## Approved servers
 
@@ -252,7 +285,7 @@ It refuses to start without `OWNER_IDS`: a bot that cannot tell anyone about an
 unapproved invite is worse than one that will not boot.
 
 ```sh
-npm test                  # 125 tests, no network needed
+npm test                  # 149 tests, no network needed
 ```
 
 ### Discord Developer Portal
@@ -292,7 +325,8 @@ src/
 ├── access/            which servers may run the bot, and telling you when one may not
 ├── consumables/       the tier file, spec resolution and the shopping list (pure)
 ├── game/              the class and specialisation catalogue — data
-├── sync/              the Blizzard API client, and the transforms it feeds
+├── sync/              the Blizzard API client, the refresh cadence, the transforms
+├── prices/            commodity auction pricing, cached per hourly refresh
 ├── plan/              diff the blueprint against a live server (pure)
 ├── apply/             execute the diff
 ├── ranks/             who gets which rank, and when (pure)

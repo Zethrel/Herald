@@ -58,5 +58,21 @@ export function readEnv(env = process.env) {
     approvedGuilds: parseIdList(env.APPROVED_GUILDS),
     unapprovedAction,
     alertWebhookUrl: env.ALERT_WEBHOOK_URL?.trim() || null,
+    // Optional. Present: the shopping list can price itself off the commodity
+    // auction house. Absent: everything else works exactly as before.
+    blizzard: readOptionalBlizzard(env),
+  };
+}
+
+function readOptionalBlizzard(env) {
+  const clientId = env.BLIZZARD_CLIENT_ID?.trim();
+  const clientSecret = env.BLIZZARD_CLIENT_SECRET?.trim();
+  if (!clientId || !clientSecret) return null;
+
+  return {
+    clientId,
+    clientSecret,
+    region: env.BLIZZARD_REGION?.trim() || 'eu',
+    locale: env.BLIZZARD_LOCALE?.trim() || 'en_GB',
   };
 }

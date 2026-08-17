@@ -54,9 +54,15 @@ export function createBlizzardClient({ clientId, clientSecret, region, locale, f
     return token;
   }
 
-  async function get(path, params = {}) {
+  /**
+   * @param {string} path
+   * @param {Record<string, string>} params
+   * @param {{namespace?: string}} options `static-` data is versioned by patch;
+   *   `dynamic-` data (auctions) is regenerated hourly.
+   */
+  async function request(path, params = {}, { namespace = `static-${region}` } = {}) {
     const url = new URL(`https://${region}.api.blizzard.com${path}`);
-    url.searchParams.set('namespace', `static-${region}`);
+    url.searchParams.set('namespace', namespace);
     url.searchParams.set('locale', locale);
     for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
 
@@ -72,16 +78,25 @@ export function createBlizzardClient({ clientId, clientSecret, region, locale, f
         continue;
       }
 
-      if (response.status === 404) return null;
+      if (response.status === 404) return { body: null, lastModified: null };
 
       if (!response.ok) {
         throw new Error(`${path} returned ${response.status} ${response.statusText}`);
       }
 
-      return response.json();
+      return {
+        body: await response.json(),
+        // When Blizzard actually generated this snapshot. Believed over any
+        // guess we could make from the clock.
+        lastModified: response.headers?.get?.('last-modified') ?? null,
+      };
     }
 
     throw new Error(`${path} kept rate limiting after four attempts.`);
+  }
+
+  async function get(path, params = {}, options = {}) {
+    return (await request(path, params, options)).body;
   }
 
   return {
@@ -112,6 +127,20 @@ export function createBlizzardClient({ clientId, clientSecret, region, locale, f
 
     getItem(id) {
       return get(`/data/wow/item/${id}`);
+    },
+
+    /**
+     * Region-wide commodity auctions -- which is where every flask, potion,
+     * feast and herb is sold in retail, so no realm needs configuring.
+     *
+     * This is the one endpoint that changes hourly, and the one that is tens
+     * of megabytes. Callers are expected to summarise and discard.
+     */
+    async getCommodities() {
+      const { body, lastModified } = await request('/data/wow/auctions/commodities', {}, {
+        namespace: `dynamic-${region}`,
+      });
+      return { auctions: body?.auctions ?? [], lastModified };
     },
   };
 }
