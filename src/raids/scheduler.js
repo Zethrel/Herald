@@ -15,13 +15,15 @@ import { updateRaid } from './repository.js';
 
 export const TICK_MS = 60_000;
 
-export function buildReminderMessage(raid, lead) {
+export function buildReminderMessage(raid, lead, { catchUp = false } = {}) {
   const { confirmed, tentative } = audienceFor(raid);
   const startsAt = new Date(raid.startsAt);
 
   const embed = new EmbedBuilder()
     .setColor(BRAND_COLOR)
-    .setTitle(`${raid.title} — ${formatLead(lead)} to go`)
+    // A catch-up ping cannot claim to be the hour-before one -- the raid may be
+    // twenty minutes away. The relative timestamp below says exactly when.
+    .setTitle(catchUp ? `${raid.title} — starting soon` : `${raid.title} — ${formatLead(lead)} to go`)
     .setDescription(
       [
         `${discordTime(startsAt, 'F')} · ${discordTime(startsAt, 'R')}`,
@@ -51,7 +53,7 @@ export function createReminderScheduler({ client, store, env, log, now = () => D
   let timer = null;
   let running = false;
 
-  async function sendReminder(guildId, raid, lead) {
+  async function sendReminder(guildId, raid, lead, { catchUp = false } = {}) {
     if (!raid.channelId) return false;
 
     const { confirmed, tentative } = audienceFor(raid);
@@ -63,12 +65,14 @@ export function createReminderScheduler({ client, store, env, log, now = () => D
     }
 
     const channel = await client.channels.fetch(raid.channelId);
-    const message = await channel.send(buildReminderMessage(raid, lead));
+    const message = await channel.send(buildReminderMessage(raid, lead, { catchUp }));
 
     // Threading the reminder under the signup post keeps the channel readable
     // when several raids are open at once.
     log.info(
-      `${raid.id}: pinged ${confirmed.length + tentative.length} raider(s), ${formatLead(lead)} before`,
+      `${raid.id}: pinged ${confirmed.length + tentative.length} raider(s), ${
+        catchUp ? 'short notice' : `${formatLead(lead)} before`
+      }`,
     );
     return message;
   }
@@ -81,7 +85,7 @@ export function createReminderScheduler({ client, store, env, log, now = () => D
 
     for (const raid of raids) {
       const leadMinutes = leadMinutesFor(raid, config);
-      const { due, expired } = dueReminders({ raid, leadMinutes, now: at });
+      const { due, expired, catchUp } = dueReminders({ raid, leadMinutes, now: at });
       if (due.length === 0 && expired.length === 0) continue;
 
       for (const lead of expired) {
@@ -96,7 +100,7 @@ export function createReminderScheduler({ client, store, env, log, now = () => D
 
       for (const lead of due) {
         try {
-          await sendReminder(guildId, raid, lead);
+          await sendReminder(guildId, raid, lead, { catchUp });
         } catch (error) {
           log.warn(`${raid.id}: could not send the ${formatLead(lead)} reminder — ${error.message}`);
         }

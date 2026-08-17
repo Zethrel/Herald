@@ -78,20 +78,30 @@ export function leadMinutesFor(raid, guildConfig) {
  * a reminder missed during downtime is closed out rather than firing the moment
  * the bot returns.
  *
- * @returns {{due: number[], expired: number[]}}
+ * `catchUp` is the exception. A raid announced two hours before it starts would
+ * otherwise have every lead time already behind it and get no ping at all,
+ * which is precisely backwards -- short notice is when people most need
+ * telling. So: a raid that has never been reminded, has not started, and has
+ * run out of lead times gets exactly one ping now. The same rule covers the bot
+ * having been offline through every window; nobody was told, the raid is soon,
+ * one ping is the right answer.
+ *
+ * @returns {{due: number[], expired: number[], catchUp: boolean}}
  */
 export function dueReminders({ raid, leadMinutes, now = Date.now(), graceMinutes = DEFAULT_GRACE_MINUTES }) {
   const sent = new Set(raid?.reminders?.sent ?? []);
   const pending = (leadMinutes ?? []).filter((lead) => !sent.has(lead));
+  const nothing = { due: [], expired: [], catchUp: false };
 
-  if (pending.length === 0) return { due: [], expired: [] };
+  // No lead times at all means reminders are off, and off means off.
+  if (pending.length === 0) return nothing;
 
   // A cancelled raid is never announced -- but its reminders are closed out, so
   // they cannot fire if it is somehow reopened later.
-  if (raid.cancelled) return { due: [], expired: pending };
+  if (raid.cancelled) return { ...nothing, expired: pending };
 
   const startsAt = Date.parse(raid.startsAt);
-  if (Number.isNaN(startsAt)) return { due: [], expired: pending };
+  if (Number.isNaN(startsAt)) return { ...nothing, expired: pending };
 
   const due = [];
   const expired = [];
@@ -106,7 +116,21 @@ export function dueReminders({ raid, leadMinutes, now = Date.now(), graceMinutes
     else expired.push(lead);
   }
 
-  return { due, expired };
+  const missedEverything =
+    due.length === 0 && expired.length === pending.length && sent.size === 0 && now < startsAt;
+
+  if (!missedEverything) return { due, expired, catchUp: false };
+
+  // Ping against the nearest lead time and close out the rest. Which one it is
+  // recorded under barely matters -- all of them are marked sent either way --
+  // but the message must not claim to be the hour-before one when the raid is
+  // twenty minutes away, so the caller is told this is a catch-up.
+  const nearest = expired[expired.length - 1];
+  return {
+    due: [nearest],
+    expired: expired.filter((lead) => lead !== nearest),
+    catchUp: true,
+  };
 }
 
 /** Record a reminder as dealt with, sent or not. */

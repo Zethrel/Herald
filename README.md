@@ -176,6 +176,15 @@ Two rules make this safe to run unattended:
   and announce a raid that is already pulling. Missed ones are closed out so
   they cannot fire later.
 
+**Short notice still gets one ping.** A raid announced two hours before the pull
+has every lead time already behind it, and saying nothing would be exactly
+backwards — short notice is when people most need telling. So a raid that has
+never been reminded, has not started, and has run out of lead times gets exactly
+one ping straight away, titled *starting soon* rather than claiming to be the
+hour-before one. The same rule covers the bot having been offline through every
+window: nobody was told, the raid is soon, one ping is the right answer. A raid
+that already got a reminder does not get a second one this way.
+
 It runs as a minute ticker rather than a timer per raid: timers do not survive a
 restart, and a raid posted three weeks out would need one held for three weeks.
 Everything a tick needs is in the store, so the process can stop and start
@@ -384,7 +393,7 @@ It refuses to start without `OWNER_IDS`: a bot that cannot tell anyone about an
 unapproved invite is worse than one that will not boot.
 
 ```sh
-npm test                  # 211 tests, no network needed
+npm test                  # 216 tests, no network needed
 ```
 
 ### Discord Developer Portal

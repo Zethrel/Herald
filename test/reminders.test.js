@@ -121,15 +121,60 @@ describe('dueReminders', () => {
     assert.deepEqual(due, [60]);
   });
 
-  it('drops one that missed its window instead of sending it late', () => {
-    // The bot was down for two hours. The hour-before reminder is no longer
-    // useful; announcing it now would be noise. The day-before one is long
-    // past too -- which is also what happens to a raid posted an hour before
-    // it starts.
-    const { due, expired } = dueReminders({ raid: raidWith(), leadMinutes, now: minutesBefore(20) });
+  it('drops a late reminder when an earlier one already went out', () => {
+    // The day-before ping was sent, then the bot was down through the
+    // hour-before window. That one is no longer useful and the roster has
+    // already been told about the raid, so it is closed out rather than sent.
+    const raid = raidWith([['u1', 'yes', 'mage.fire']], { reminders: { leadMinutes: null, sent: [1440] } });
+    const { due, expired, catchUp } = dueReminders({ raid, leadMinutes, now: minutesBefore(20) });
+
+    assert.deepEqual(due, []);
+    assert.deepEqual(expired, [60]);
+    assert.equal(catchUp, false);
+  });
+
+  it('pings once for a raid announced at short notice', () => {
+    // Posted twenty minutes before the pull: every lead time is already behind
+    // it. Saying nothing would be exactly backwards -- short notice is when
+    // people most need telling.
+    const { due, expired, catchUp } = dueReminders({ raid: raidWith(), leadMinutes, now: minutesBefore(20) });
+
+    assert.equal(catchUp, true);
+    assert.deepEqual(due, [60]);
+    // The rest are closed out in the same pass, so this fires exactly once.
+    assert.deepEqual(expired, [1440]);
+  });
+
+  it('pings once when the bot was offline through every window', () => {
+    // Nobody was ever told and the raid is soon: same answer, same rule.
+    const { due, catchUp } = dueReminders({
+      raid: raidWith(),
+      leadMinutes: [1440, 120],
+      now: minutesBefore(10),
+    });
+
+    assert.equal(catchUp, true);
+    assert.deepEqual(due, [120]);
+  });
+
+  it('does not catch up on a raid that has already started', () => {
+    const { due, expired, catchUp } = dueReminders({
+      raid: raidWith(),
+      leadMinutes,
+      now: startMs + 60_000,
+    });
 
     assert.deepEqual(due, []);
     assert.deepEqual(expired, [1440, 60]);
+    assert.equal(catchUp, false);
+  });
+
+  it('does not catch up when reminders are off', () => {
+    const raid = raidWith([['u1', 'yes', 'mage.fire']], { reminders: { leadMinutes: [], sent: [] } });
+    const { due, catchUp } = dueReminders({ raid, leadMinutes: [], now: minutesBefore(5) });
+
+    assert.deepEqual(due, []);
+    assert.equal(catchUp, false);
   });
 
   it('never announces a raid that has already started', () => {
@@ -143,25 +188,32 @@ describe('dueReminders', () => {
     assert.deepEqual(expired, [15]);
   });
 
-  it('closes out both reminders when the bot was down for a day', () => {
-    const { due, expired } = dueReminders({ raid: raidWith(), leadMinutes, now: startMs + 3_600_000 });
+  it('closes out both reminders when the raid is already over', () => {
+    const { due, expired, catchUp } = dueReminders({
+      raid: raidWith(),
+      leadMinutes,
+      now: startMs + 3_600_000,
+    });
 
     assert.deepEqual(due, []);
     assert.deepEqual(expired, [1440, 60]);
+    assert.equal(catchUp, false);
   });
 
   it('never pings for a cancelled raid, and closes its reminders out', () => {
     const raid = raidWith([['u1', 'yes', 'mage.fire']], { cancelled: true });
-    const { due, expired } = dueReminders({ raid, leadMinutes, now: minutesBefore(59) });
+    const { due, expired, catchUp } = dueReminders({ raid, leadMinutes, now: minutesBefore(59) });
 
     assert.deepEqual(due, []);
     assert.deepEqual(expired, [1440, 60]);
+    assert.equal(catchUp, false);
   });
 
   it('does nothing when reminders are off', () => {
     assert.deepEqual(dueReminders({ raid: raidWith(), leadMinutes: [], now: startMs }), {
       due: [],
       expired: [],
+      catchUp: false,
     });
   });
 });
@@ -283,9 +335,28 @@ describe('the reminder scheduler', () => {
     await cleanup();
   });
 
-  it('closes out a reminder missed during downtime without sending it', async () => {
+  it('sends one catch-up ping for a short-notice raid, and only one', async () => {
     const { scheduler, sent, store, guildId, cleanup } = await harness({
       now: minutesBefore(5),
+      raid: raidWith(),
+    });
+
+    await scheduler.tick();
+    await scheduler.tick();
+
+    assert.equal(sent.length, 1);
+    // Not "1 hour to go" -- the raid is five minutes away.
+    assert.match(sent[0].embeds[0].data.title, /starting soon/);
+
+    const config = await store.get(guildId);
+    assert.deepEqual(config.raids['raid-1'].reminders.sent, [1440, 60]);
+
+    await cleanup();
+  });
+
+  it('does not catch up once the raid has started', async () => {
+    const { scheduler, sent, store, guildId, cleanup } = await harness({
+      now: startMs + 60_000,
       raid: raidWith(),
     });
 
