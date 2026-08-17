@@ -286,7 +286,7 @@ describe('buildShoppingList', () => {
     });
 
     assert.deepEqual(list.missingSlots, [
-      { spec: specByKey('rogue.outlaw'), slots: ['food', 'potion', 'oil'] },
+      { spec: specByKey('rogue.outlaw'), slots: ['food', 'potion', 'oil'], noSecondary: true },
     ]);
     assert.equal(list.consumables.length, 1);
   });
@@ -453,5 +453,44 @@ describe('alternatives, and an explicit "none"', () => {
     assert.equal(list.consumables.length, 1);
     assert.equal(list.consumables[0].name, 'Flask of the Shattered Sun');
     assert.equal(list.consumables[0].quantity, 8);
+  });
+});
+
+describe('a roster that brings an unconfigured spec', () => {
+  const tier = normalizeDataset({
+    items: { 'flask-crit': { name: 'Crit Flask' }, feast: { name: 'Feast' } },
+    defaults: { all: { food: 'feast' }, crit: { flask: 'flask-crit' } },
+    specs: { 'mage.fire': { secondary: 'crit' } },
+  });
+
+  it('says which specs have no stat priority, rather than shrugging', () => {
+    const list = buildShoppingList({
+      roster: [
+        { spec: specByKey('mage.fire'), count: 2 },
+        { spec: specByKey('rogue.outlaw'), count: 3 },
+      ],
+      dataset: tier,
+      perRaider: { flask: 1, food: 1, potion: 0, oil: 0 },
+    });
+
+    const unstated = list.missingSlots.filter((entry) => entry.noSecondary);
+    assert.deepEqual(
+      unstated.map((entry) => entry.spec.key),
+      ['rogue.outlaw'],
+    );
+    // The configured spec still gets counted; one gap does not sink the list.
+    assert.equal(list.consumables.find((entry) => entry.name === 'Crit Flask').quantity, 2);
+  });
+
+  it('does not blame the stat priority when it is set and something else is missing', () => {
+    const list = buildShoppingList({
+      roster: [{ spec: specByKey('mage.fire'), count: 1 }],
+      dataset: tier,
+      perRaider: { flask: 1, food: 1, potion: 1, oil: 1 },
+    });
+
+    const [entry] = list.missingSlots;
+    assert.equal(entry.noSecondary, false);
+    assert.deepEqual(entry.slots, ['potion', 'oil']);
   });
 });

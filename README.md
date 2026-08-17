@@ -82,6 +82,7 @@ needs editing.
 | `/consumables tier` | Which tier the data is for, how complete it is, what is still missing. |
 | `/consumables compare [spec]` | What Method says, against the guild's own call. |
 | `/consumables report <source> <spec> <slot> <item>` | Record what one guide says (Manage Server). |
+| `/consumables secondary <spec> <stat>` | Record what a spec stacks — this is what picks its flask (Manage Server). |
 | `/consumables set\|clear` | Override a slot for a spec on this server (Manage Server). |
 | `/guilds list\|approve\|revoke\|leave` | The server allowlist. Bot owners only — see below. |
 | `/about` | What the bot does. |
@@ -347,7 +348,34 @@ works in any slot for the same reason. Alternatives are equally acceptable, not
 a fallback, so `/consumables spec` renders them as *"X or Y"*; the shopping list
 buys only the first, since buying both would double the order.
 
-Add item slots only where a spec departs from the blocks above. Item names may
+Add item slots only where a spec departs from the blocks above.
+
+### You do not edit this per raid
+
+Worth being explicit, because the two get conflated: **the tier file is a lookup
+table, not a roster.** It answers "what does a Fire Mage bring", and signups
+answer "who is coming" — `/consumables shopping raid:<raid>` reads the actual
+roster, so nothing here is commented or uncommented per raid night.
+
+What does change is a spec's stat priority, and that moves with a patch or a
+build rather than with a raid. When someone signs up as a spec nobody has
+recorded one for, the shopping list says so by name and gives the command:
+
+```
+⚠️ No stat priority recorded (2)
+Outlaw Rogue, Havoc Demon Hunter
+
+Fix with `/consumables secondary spec:Outlaw Rogue stat:crit` — then re-run this.
+```
+
+That command takes effect immediately, for that server, without touching the
+file or restarting — same store as `/consumables set`. The text file stays the
+version-controlled baseline; runtime corrections live alongside it and win.
+
+Herald will not fill a stat priority in on its own. It cannot: which secondary a
+spec stacks is a judgement about that spec's build, and inventing one is exactly
+the guess this whole file refuses to make. What it does instead is notice the
+moment a raid needs one and hand you the one-line fix. Item names may
 contain commas — assignments are separated by semicolons for exactly that
 reason — a `-` or a blank means "not filled in yet" and is skipped, and `#`
 starts a comment. A line it cannot read is reported with its line number and
@@ -524,7 +552,7 @@ It refuses to start without `OWNER_IDS`: a bot that cannot tell anyone about an
 unapproved invite is worse than one that will not boot.
 
 ```sh
-npm test                  # 297 tests, no network needed
+npm test                  # 299 tests, no network needed
 ```
 
 ### Discord Developer Portal

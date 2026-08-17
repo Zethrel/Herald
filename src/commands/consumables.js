@@ -7,7 +7,7 @@ import {
 } from 'discord.js';
 
 import { BRAND_COLOR, FOOTER } from '../branding.js';
-import { SLOTS, SLOT_LABELS, coverage, isStale } from '../consumables/dataset.js';
+import { SECONDARY_ALIASES, SECONDARY_STATS, SLOTS, SLOT_LABELS, coverage, isStale } from '../consumables/dataset.js';
 import { SPECS, SPEC_KEYS, findSpec, specByKey } from '../game/specs.js';
 import { DEFAULT_PER_RAIDER, buildShoppingList, parseRoster } from '../consumables/shopping.js';
 import { formatMoney, priceLines } from '../prices/auctions.js';
@@ -125,6 +125,20 @@ export const data = new SlashCommandBuilder()
   )
   .addSubcommand((sub) =>
     sub
+      .setName('secondary')
+      .setDescription("Record which secondary stat a spec stacks — this is what picks its flask (Manage Server)")
+      .addStringOption((option) =>
+        option.setName('spec').setDescription('Which spec').setRequired(true).setAutocomplete(true),
+      )
+      .addStringOption((option) =>
+        option
+          .setName('stat')
+          .setDescription('crit, haste, mastery, versatility — or two, as "crit|haste"')
+          .setRequired(true),
+      ),
+  )
+  .addSubcommand((sub) =>
+    sub
       .setName('clear')
       .setDescription("Drop this server's override for a spec (Manage Server)")
       .addStringOption((option) =>
@@ -185,6 +199,44 @@ export async function execute(interaction, { store, dataset, prices, log }) {
   if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
     return interaction.reply({
       content: 'Changing what the raid is told to bring is a Manage Server job.',
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+
+  if (sub === 'secondary') {
+    const typed = interaction.options.getString('stat');
+    const parsed = parseSecondaryOption(typed);
+
+    if (!parsed) {
+      return interaction.reply({
+        content: `I do not know the stat "${typed}". Use ${SECONDARY_STATS.join(', ')} — or two of them, written as \`crit|haste\`.`,
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+
+    const next = {
+      ...overrides,
+      [spec.key]: {
+        ...(overrides[spec.key] ?? {}),
+        secondary: parsed.length === 1 ? parsed[0] : parsed,
+        updatedAt: new Date().toISOString(),
+        setBy: interaction.user.id,
+      },
+    };
+
+    await store.update(interaction.guildId, { consumables: { overrides: next } });
+    log.info(`${interaction.user.tag} set ${spec.key} secondary = ${parsed.join('|')}`);
+
+    const resolved = resolveSpecConsumables({ spec, dataset, overrides: next, reports });
+    const flask = resolved.slots.flask;
+
+    return interaction.reply({
+      content: [
+        `**${spec.name} ${spec.className}** now stacks **${parsed.join(' or ')}**.`,
+        flask.item
+          ? `Flask: **${flask.item.name}**${flask.alternatives.length > 0 ? ` or ${flask.alternatives.map((entry) => entry.name).join(', ')}` : ''}.`
+          : 'No flask is recorded for that stat yet — add one to the tier file.',
+      ].join('\n'),
       flags: MessageFlags.Ephemeral,
     });
   }
@@ -266,6 +318,19 @@ export async function execute(interaction, { store, dataset, prices, log }) {
 
 function resolveSpecOption(value) {
   return specByKey(value) ?? findSpec(value);
+}
+
+/** "crit", "Critical Strike", or "crit|haste" for a spec that runs either. */
+function parseSecondaryOption(text) {
+  const parts = (text ?? '')
+    .split(/\s*[|/,]\s*/)
+    .map((part) => SECONDARY_ALIASES[part.trim().toLowerCase()])
+    .filter(Boolean);
+
+  const unique = [...new Set(parts)];
+  return unique.length > 0 && unique.length === (text ?? '').split(/\s*[|/,]\s*/).filter(Boolean).length
+    ? unique
+    : null;
 }
 
 function renderSlots(resolved) {
@@ -598,10 +663,28 @@ async function showShopping(interaction, { dataset, overrides, prices, store, re
     });
   }
 
-  if (list.missingSlots.length > 0) {
+  const unstated = list.missingSlots.filter((entry) => entry.noSecondary);
+  const otherGaps = list.missingSlots.filter((entry) => !entry.noSecondary);
+
+  if (unstated.length > 0) {
+    // The common case, and the actionable one: the roster brought a spec whose
+    // stat priority nobody has written down, so it has no flask to buy.
+    embed.addFields({
+      name: `⚠️ No stat priority recorded (${unstated.length})`,
+      value: [
+        unstated.map((entry) => `${entry.spec.name} ${entry.spec.className}`).join(', '),
+        '',
+        `Fix with \`/consumables secondary spec:${unstated[0].spec.name} ${unstated[0].spec.className} stat:crit\` — then re-run this.`,
+      ]
+        .join('\n')
+        .slice(0, 1024),
+    });
+  }
+
+  if (otherGaps.length > 0) {
     embed.addFields({
       name: '⚠️ Not counted',
-      value: list.missingSlots
+      value: otherGaps
         .map((entry) => `${entry.spec.name} ${entry.spec.className} — no ${entry.slots.join(', ')}`)
         .join('\n')
         .slice(0, 1024),

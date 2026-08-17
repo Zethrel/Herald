@@ -87,7 +87,11 @@ export function buildShoppingList({
       wanted.set(key, entry);
     }
 
-    if (empty.length > 0) missingSlots.push({ spec, slots: empty });
+    if (empty.length > 0) {
+      // A missing flask usually has one cause -- nobody has recorded what the
+      // spec stacks -- and saying so turns a shrug into a one-command fix.
+      missingSlots.push({ spec, slots: empty, noSecondary: resolved.secondary.length === 0 });
+    }
   }
 
   const crafts = [];
