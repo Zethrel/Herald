@@ -105,6 +105,26 @@ describe('resolveSpecConsumables', () => {
     assert.equal(resolved.slots.food.via, 'default:healer');
   });
 
+  it('prefers the role default over the stat default', () => {
+    // Every healer is an intellect user, so a healer line that lost to an
+    // intellect line could never apply to anyone.
+    const withBoth = normalizeDataset({
+      ...dataset,
+      defaults: {
+        ...dataset.defaults,
+        intellect: { ...dataset.defaults.intellect, food: 'flask-int' },
+        healer: { food: 'feast-of-testing' },
+      },
+    });
+
+    const healer = resolveSpecConsumables({ spec: specByKey('priest.holy'), dataset: withBoth });
+    assert.equal(healer.slots.food.via, 'default:healer');
+
+    // A caster that is not a healer still gets the intellect line.
+    const caster = resolveSpecConsumables({ spec: specByKey('mage.frost'), dataset: withBoth });
+    assert.equal(caster.slots.food.via, 'default:intellect');
+  });
+
   it('reports an empty slot instead of inventing one', () => {
     const resolved = resolveSpecConsumables({ spec: specByKey('rogue.outlaw'), dataset });
 

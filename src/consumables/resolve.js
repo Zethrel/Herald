@@ -14,8 +14,8 @@ import { consensusFor } from '../sources/compare.js';
  *   guild      a /consumables set override on this server
  *   spec       the tier file's entry for this exact spec
  *   sources    what the guides agree on, where they agree
- *   stat       the tier file's default for its primary stat
  *   role       the tier file's default for its role
+ *   stat       the tier file's default for its primary stat
  *
  * Sources sit below anything a person wrote deliberately and above the generic
  * defaults: a guide that has looked at this exact spec beats "all intellect
@@ -23,8 +23,9 @@ import { consensusFor } from '../sources/compare.js';
  * disagree they contribute nothing and the chain falls through -- see
  * `src/sources/compare.js` for why a split is not a recommendation.
  *
- * Role sits below stat so a healer default cannot quietly outrank an explicit
- * intellect entry, while still catching healer-only consumables.
+ * Role beats stat because it is the narrower rule: every healer is an intellect
+ * user, so a `healer: food` line that lost to `intellect: food` could never
+ * apply to anyone. Whoever writes a role default means it.
  */
 export function resolveSpecConsumables({ spec, dataset, overrides = {}, reports = null }) {
   const guild = overrides?.[spec.key] ?? {};
@@ -39,8 +40,8 @@ export function resolveSpecConsumables({ spec, dataset, overrides = {}, reports 
       ['guild', guild[slot]],
       ['spec', specEntry[slot]],
       ['sources', consensus[slot]?.item ?? null],
-      [`default:${spec.stat}`, statDefault[slot]],
       [`default:${spec.role}`, roleDefault[slot]],
+      [`default:${spec.stat}`, statDefault[slot]],
     ];
 
     const hit = candidates.find(([, reference]) => Boolean(reference));

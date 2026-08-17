@@ -244,11 +244,11 @@ The file has four parts:
 | `items` | slug → name, item id (drives the Wowhead links) |
 | `reports` | what Method says, per spec — see *What Method says* |
 | `recipes` | slug → profession, yield, reagents. This is what makes the shopping list possible |
-| `defaults` | per primary stat (`intellect`, `agility`, `strength`) and per role (`healer`, `tank`) |
+| `defaults` | per role (`healer`, `tank`) and per primary stat (`intellect`, `agility`, `strength`) |
 | `specs` | per spec, when a spec departs from its stat's default |
 
 Answers resolve most specific first: **this server's override → the spec's own
-entry → what Method says → its primary stat → its role.** So one
+entry → what Method says → its role → its primary stat.** So one
 `intellect` entry answers for all nineteen intellect specs, and you only write a
 spec entry where a spec actually differs. `/consumables spec` says which of
 those a given answer came from, so a raider can see when they are reading a
@@ -304,12 +304,49 @@ Every quoted line keeps Method's name, the page URL and when it was read. This
 is someone else's editorial judgement; Herald repeats it with attribution rather
 than absorbing it.
 
-### Getting it in
+### Getting it in: fill in the blanks
 
-`/consumables report source:method spec:fire mage slot:flask item:"…" url:…`
-records one answer for one spec, on one server. That works today and needs
-nothing external. For bulk, fill the `reports` section of the tier file — the
-shape is in [`tiers/example.json`](tiers/example.json).
+[`tiers/current.txt`](tiers/current.txt) is a fill-in-the-blanks file. Open it,
+type the item names next to the labels, and run one command:
+
+```sh
+npm run import-tier -- tiers/current.txt --dry   # show what it read
+npm run import-tier -- tiers/current.txt         # write it
+npm run sync-tier                                # item ids, yields, reagents
+```
+
+The top of the file is five lines, and for most tiers they are the whole job:
+
+```
+intellect: flask = Flask of X; food = Feast of Y; potion = Potion of Z
+agility:   flask = ...
+strength:  flask = ...
+healer:    food = ...
+tank:      food = ...
+```
+
+Below that is every spec, commented out, each with a link to its Method page.
+Uncomment one only where Method says something different from the default above,
+and list only the slot that differs:
+
+```
+fire mage: potion = Potion of Something Else
+```
+
+Four filled-in default lines answer all 39 specs with no gaps. Item names may
+contain commas — assignments are separated by semicolons for exactly that
+reason — a `-` or a blank means "not filled in yet" and is skipped, and `#`
+starts a comment. A line it cannot read is reported with its line number and
+skipped; every other line still lands.
+
+Add `--source method` to record the spec lines as *what Method says* rather than
+as the guild's own data. It attaches each spec's guide URL and the date, so
+`/consumables compare` can show it with attribution. Default lines are refused in
+that mode: Method publishes a page per spec, not a ruling on "all intellect
+casters", and putting one in their mouth would be a fabrication.
+
+`/consumables report source:method spec:fire mage slot:flask item:"…"` records a
+single answer from inside Discord, for one server, without touching the file.
 
 **Guide links are derived from the pattern.** Method organises its pages as
 `method.gg/guides/<spec>-<class>/stats-races-and-consumables`, so
@@ -468,7 +505,7 @@ It refuses to start without `OWNER_IDS`: a bot that cannot tell anyone about an
 unapproved invite is worse than one that will not boot.
 
 ```sh
-npm test                  # 255 tests, no network needed
+npm test                  # 275 tests, no network needed
 ```
 
 ### Discord Developer Portal
@@ -506,7 +543,8 @@ src/
 ├── blueprint.js       what a set-up server looks like — pure data
 ├── store.js           per-server settings and the allowlist, JSON on disk
 ├── access/            which servers may run the bot, and telling you when one may not
-├── consumables/       the tier file, spec resolution and the shopping list (pure)
+├── consumables/       the tier file, its text importer, spec resolution and
+│                     the shopping list (all pure)
 ├── game/              the class and specialisation catalogue — data
 ├── sources/           what each guide recommends, and how they compare (pure)
 ├── sync/              the Blizzard API client, the refresh cadence, the transforms

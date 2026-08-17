@@ -1,0 +1,100 @@
+# Herald tier data — fill in the blanks, then:
+#
+#   npm run import-tier -- tiers/current.txt
+#   npm run sync-tier                          (item ids, yields, reagents)
+#
+# Format:   key: slot = item name; slot = item name
+# Slots:    flask, food, potion
+# Separator is a semicolon, so item names may contain commas.
+# A dash or a blank value means "not filled in yet" and is skipped.
+# Anything after # is a comment.
+
+
+# ---- Defaults -------------------------------------------------------------
+#
+# These five lines cover all 39 specs. Fill these in first — for most tiers
+# they are the whole job, and the spec list below is only for exceptions.
+
+intellect: flask = -; food = -; potion = -
+agility:   flask = -; food = -; potion = -
+strength:  flask = -; food = -; potion = -
+
+# Role beats stat: every healer is an intellect user, so a healer line here
+# wins for healers and the intellect line still covers every other caster.
+healer:    food = -
+tank:      food = -
+
+
+# ---- Exceptions -----------------------------------------------------------
+#
+# Uncomment a line only where Method says something different from the default
+# above, and list only the slots that differ. Everything left commented out
+# falls back to the defaults, which is the point.
+#
+# The link is that spec's Method page.
+
+# Death Knight
+# blood death knight        : flask = -; food = -; potion = -   # https://www.method.gg/guides/blood-death-knight/stats-races-and-consumables
+# frost death knight        : flask = -; food = -; potion = -   # https://www.method.gg/guides/frost-death-knight/stats-races-and-consumables
+# unholy death knight       : flask = -; food = -; potion = -   # https://www.method.gg/guides/unholy-death-knight/stats-races-and-consumables
+
+# Demon Hunter
+# havoc demon hunter        : flask = -; food = -; potion = -   # https://www.method.gg/guides/havoc-demon-hunter/stats-races-and-consumables
+# vengeance demon hunter    : flask = -; food = -; potion = -   # https://www.method.gg/guides/vengeance-demon-hunter/stats-races-and-consumables
+
+# Druid
+# balance druid             : flask = -; food = -; potion = -   # https://www.method.gg/guides/balance-druid/stats-races-and-consumables
+# feral druid               : flask = -; food = -; potion = -   # https://www.method.gg/guides/feral-druid/stats-races-and-consumables
+# guardian druid            : flask = -; food = -; potion = -   # https://www.method.gg/guides/guardian-druid/stats-races-and-consumables
+# restoration druid         : flask = -; food = -; potion = -   # https://www.method.gg/guides/restoration-druid/stats-races-and-consumables
+
+# Evoker
+# devastation evoker        : flask = -; food = -; potion = -   # https://www.method.gg/guides/devastation-evoker/stats-races-and-consumables
+# preservation evoker       : flask = -; food = -; potion = -   # https://www.method.gg/guides/preservation-evoker/stats-races-and-consumables
+# augmentation evoker       : flask = -; food = -; potion = -   # https://www.method.gg/guides/augmentation-evoker/stats-races-and-consumables
+
+# Hunter
+# beast mastery hunter      : flask = -; food = -; potion = -   # https://www.method.gg/guides/beast-mastery-hunter/stats-races-and-consumables
+# marksmanship hunter       : flask = -; food = -; potion = -   # https://www.method.gg/guides/marksmanship-hunter/stats-races-and-consumables
+# survival hunter           : flask = -; food = -; potion = -   # https://www.method.gg/guides/survival-hunter/stats-races-and-consumables
+
+# Mage
+# arcane mage               : flask = -; food = -; potion = -   # https://www.method.gg/guides/arcane-mage/stats-races-and-consumables
+# fire mage                 : flask = -; food = -; potion = -   # https://www.method.gg/guides/fire-mage/stats-races-and-consumables
+# frost mage                : flask = -; food = -; potion = -   # https://www.method.gg/guides/frost-mage/stats-races-and-consumables
+
+# Monk
+# brewmaster monk           : flask = -; food = -; potion = -   # https://www.method.gg/guides/brewmaster-monk/stats-races-and-consumables
+# mistweaver monk           : flask = -; food = -; potion = -   # https://www.method.gg/guides/mistweaver-monk/stats-races-and-consumables
+# windwalker monk           : flask = -; food = -; potion = -   # https://www.method.gg/guides/windwalker-monk/stats-races-and-consumables
+
+# Paladin
+# holy paladin              : flask = -; food = -; potion = -   # https://www.method.gg/guides/holy-paladin/stats-races-and-consumables
+# protection paladin        : flask = -; food = -; potion = -   # https://www.method.gg/guides/protection-paladin/stats-races-and-consumables
+# retribution paladin       : flask = -; food = -; potion = -   # https://www.method.gg/guides/retribution-paladin/stats-races-and-consumables
+
+# Priest
+# discipline priest         : flask = -; food = -; potion = -   # https://www.method.gg/guides/discipline-priest/stats-races-and-consumables
+# holy priest               : flask = -; food = -; potion = -   # https://www.method.gg/guides/holy-priest/stats-races-and-consumables
+# shadow priest             : flask = -; food = -; potion = -   # https://www.method.gg/guides/shadow-priest/stats-races-and-consumables
+
+# Rogue
+# assassination rogue       : flask = -; food = -; potion = -   # https://www.method.gg/guides/assassination-rogue/stats-races-and-consumables
+# outlaw rogue              : flask = -; food = -; potion = -   # https://www.method.gg/guides/outlaw-rogue/stats-races-and-consumables
+# subtlety rogue            : flask = -; food = -; potion = -   # https://www.method.gg/guides/subtlety-rogue/stats-races-and-consumables
+
+# Shaman
+# elemental shaman          : flask = -; food = -; potion = -   # https://www.method.gg/guides/elemental-shaman/stats-races-and-consumables
+# enhancement shaman        : flask = -; food = -; potion = -   # https://www.method.gg/guides/enhancement-shaman/stats-races-and-consumables
+# restoration shaman        : flask = -; food = -; potion = -   # https://www.method.gg/guides/restoration-shaman/stats-races-and-consumables
+
+# Warlock
+# affliction warlock        : flask = -; food = -; potion = -   # https://www.method.gg/guides/affliction-warlock/stats-races-and-consumables
+# demonology warlock        : flask = -; food = -; potion = -   # https://www.method.gg/guides/demonology-warlock/stats-races-and-consumables
+# destruction warlock       : flask = -; food = -; potion = -   # https://www.method.gg/guides/destruction-warlock/stats-races-and-consumables
+
+# Warrior
+# arms warrior              : flask = -; food = -; potion = -   # https://www.method.gg/guides/arms-warrior/stats-races-and-consumables
+# fury warrior              : flask = -; food = -; potion = -   # https://www.method.gg/guides/fury-warrior/stats-races-and-consumables
+# protection warrior        : flask = -; food = -; potion = -   # https://www.method.gg/guides/protection-warrior/stats-races-and-consumables
+
