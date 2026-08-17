@@ -11,7 +11,8 @@
     "start": "node --env-file-if-exists=.env src/index.js",
     "deploy": "node --env-file-if-exists=.env src/deploy-commands.js",
     "test": "node --test \"test/*.test.js\"",
-    "sync-tier": "node --env-file-if-exists=.env scripts/sync-tier.js"
+    "sync-tier": "node --env-file-if-exists=.env scripts/sync-tier.js",
+    "check-guides": "node scripts/check-guides.js"
   },
   "license": "UNLICENSED",
   "dependencies": {

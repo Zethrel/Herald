@@ -16,6 +16,7 @@ import { getRaid, listRaids } from '../raids/repository.js';
 import { rosterForShopping } from '../raids/model.js';
 import { SOURCES, sourceName } from '../sources/registry.js';
 import { compareSpec, disagreements, mergeReports } from '../sources/compare.js';
+import { guideUrl, isConfirmed } from '../sources/urls.js';
 
 export const data = new SlashCommandBuilder()
   .setName('consumables')
@@ -356,12 +357,28 @@ function showCompare(interaction, { dataset, reports }) {
     .setTitle(`${spec.name} ${spec.className} — what the guides say`)
     .setFooter({ text: FOOTER });
 
+  // The pages themselves, whether or not anyone has recorded an answer from
+  // them. Useful on its own: it saves a raider working out the URL.
+  const links = SOURCES.filter((source) => !source.local)
+    .map((source) => {
+      const url = guideUrl(source.id, spec);
+      if (!url) return `${source.name}: _no link on file_`;
+      return `[${source.name}](${url})${isConfirmed(source.id, spec) ? '' : ' _(unverified link)_'}`;
+    })
+    .join(' · ');
+
   if (sources.length === 0) {
     embed.setDescription(
-      'Nothing recorded for this spec yet. An officer can add what a guide says with `/consumables report`.',
+      [
+        'Nothing recorded for this spec yet. An officer can add what a guide says with `/consumables report`.',
+        '',
+        links,
+      ].join('\n'),
     );
     return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
   }
+
+  embed.setDescription(links);
 
   for (const slot of SLOTS) {
     const { opinions, agreement } = slots[slot];
@@ -373,7 +390,8 @@ function showCompare(interaction, { dataset, reports }) {
           ? '_nobody has said_'
           : opinions
               .map((opinion) => {
-                const link = opinion.url ? ` ([source](${opinion.url}))` : '';
+                const href = opinion.url ?? guideUrl(opinion.sourceId, spec);
+                const link = href ? ` ([source](${href}))` : '';
                 const age = opinion.fetchedAt
                   ? ` · <t:${Math.floor(Date.parse(opinion.fetchedAt) / 1000)}:R>`
                   : '';

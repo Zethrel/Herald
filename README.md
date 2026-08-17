@@ -307,7 +307,26 @@ For anything bulk, fill the `reports` section of the tier file — the shape is 
 [`tiers/example.json`](tiers/example.json), which shows three guides on one
 spec, two agreeing and one not.
 
-**There is no scraper, deliberately.** Automating this needs per-site HTML
+**Guide links are derived where the pattern is known.** Method organises its
+pages as `method.gg/guides/<spec>-<class>/stats-races-and-consumables`, so
+`/consumables compare` links straight to the right page for all 39 specs.
+Deriving those is safe in a way guessing selectors is not: a wrong URL 404s
+loudly and is fixed with one line, while a wrong selector returns the wrong
+flask and says nothing.
+
+Four of the slugs were checked by hand against the live site; the rest follow
+the pattern and are shown as *unverified link* until `npm run check-guides`
+says otherwise. That script requests each URL once, a second apart, reads no
+page content, and prints the confirmed slugs to paste back — plus any 404s that
+need an entry in `METHOD_OVERRIDES`. It distinguishes a 404 (the slug is wrong)
+from a 403 or 5xx (the network is in the way), because turning a proxy block
+into a list of "corrections" would be worse than no answer at all.
+
+Icy Veins and Wowhead organise their guides differently and neither pattern has
+been checked, so neither is guessed at — those show *no link on file* until
+someone confirms the shape.
+
+**There is still no scraper, deliberately.** Automating this needs per-site HTML
 selectors, and those can only be written against the real pages and re-verified
 every time a site reworks its guide templates — which all three do between
 tiers. Selectors written blind would look right, break silently mid-tier, and be
@@ -449,7 +468,7 @@ It refuses to start without `OWNER_IDS`: a bot that cannot tell anyone about an
 unapproved invite is worse than one that will not boot.
 
 ```sh
-npm test                  # 242 tests, no network needed
+npm test                  # 253 tests, no network needed
 ```
 
 ### Discord Developer Portal
