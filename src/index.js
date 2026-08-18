@@ -75,4 +75,29 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
   });
 }
 
-await client.login(env.token);
+try {
+  await client.login(env.token);
+} catch (error) {
+  // The two ways a first launch fails, both of which Discord reports in terms
+  // that do not name the fix.
+  const hints = {
+    DisallowedIntents: [
+      'Discord refused the Server Members Intent.',
+      'Turn it on: Developer Portal → your app → Bot → Privileged Gateway Intents →',
+      'SERVER MEMBERS INTENT → Save Changes. Then start again.',
+      '',
+      'It is what tells the bot someone joined, so the default rank depends on it.',
+    ],
+    TokenInvalid: [
+      'Discord rejected the token.',
+      'It must be the Bot token — Developer Portal → your app → Bot → Reset Token —',
+      'not the Application ID and not the Public Key.',
+      '',
+      'Resetting the token invalidates the old one, so .env needs the new value.',
+    ],
+  };
+
+  const hint = hints[error.code] ?? hints[error.name];
+  console.error(`\n${hint ? hint.join('\n') : `Could not log in: ${error.message}`}\n`);
+  process.exit(1);
+}
