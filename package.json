@@ -13,7 +13,8 @@
     "test": "node --test \"test/*.test.js\"",
     "sync-tier": "node --env-file-if-exists=.env scripts/sync-tier.js",
     "check-guides": "node scripts/check-guides.js",
-    "import-tier": "node scripts/import-tier.js"
+    "import-tier": "node scripts/import-tier.js",
+    "invite": "node --env-file-if-exists=.env scripts/invite.js"
   },
   "license": "UNLICENSED",
   "dependencies": {

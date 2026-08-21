@@ -561,14 +561,11 @@ npm test                  # 306 tests, no network needed
    Without it Discord never tells the bot about a join, and the default rank
    never gets handed out. *Message Content* is not needed.
 2. **Installation / OAuth2 → scopes**: `bot` and `applications.commands`.
-3. Permissions: Manage Roles, Manage Channels, View Channels, Send Messages,
-   Embed Links, Add Reactions, Read Message History, Manage Messages.
-   (*Manage Messages* is what lets the bot pull a member's stale reaction off
-   the welcome message when they switch rank.)
-
-   ```
-   https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&scope=bot+applications.commands&permissions=268528720
-   ```
+3. Invite it with `npm run invite`, which prints the URL and what each
+   permission is for. It builds the link from `DISCORD_CLIENT_ID`, because the
+   `client_id` in that URL is the **Application ID** — a user id or a server id
+   there gives *Unknown Application*, an error that does not say which of the
+   three ids is wrong.
 
 4. **Drag the bot's role above every rank it manages** in Server Settings →
    Roles. Discord refuses to let any bot hand out a role that sits above its
