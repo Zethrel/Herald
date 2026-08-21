@@ -478,7 +478,7 @@ function showCompare(interaction, { dataset, reports }) {
   embed.addFields({
     name: '​',
     value:
-      'Where they disagree Herald picks nothing and falls back to the tier file — a split means the choice is close, or one guide is stale.',
+      `Where they disagree ${FOOTER} picks nothing and falls back to the tier file — a split means the choice is close, or one guide is stale.`,
   });
 
   return interaction.reply({ embeds: [embed] });
@@ -514,7 +514,7 @@ function showSpec(interaction, { spec, dataset, overrides, reports }) {
     embed.addFields({
       name: 'Missing entries',
       value:
-        'An officer can fill these in with `/consumables set`. Herald will not guess at a consumable it has not been told about.',
+        `An officer can fill these in with \`/consumables set\`. ${FOOTER} will not guess at a consumable it has not been told about.`,
     });
   }
 

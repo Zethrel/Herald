@@ -8,7 +8,7 @@
   "updatedAt": null,
   "staleAfterDays": 90,
   "sources": [],
-  "note": "Nothing is filled in yet. Herald refuses to invent consumables: an empty slot renders as 'not set for this tier' rather than a guess. See example.json for the shape. Fill in `items` (a name and \"craft\": true is enough) plus `defaults`/`specs` from a source you trust, put the link in `sources`, then run `npm run sync-tier` to have Blizzard's API fill in the item ids, craft yields and reagents. `reports` is what Method's guide says, per spec; /consumables compare shows it against the guild's own recorded view, and Herald uses it only where nothing more specific answers.",
+  "note": "Nothing is filled in yet. The Quartermaster refuses to invent consumables: an empty slot renders as 'not set for this tier' rather than a guess. See example.json for the shape. Fill in `items` (a name and \"craft\": true is enough) plus `defaults`/`specs` from a source you trust, put the link in `sources`, then run `npm run sync-tier` to have Blizzard's API fill in the item ids, craft yields and reagents. `reports` is what Method's guide says, per spec; /consumables compare shows it against the guild's own recorded view, and the bot uses it only where nothing more specific answers.",
   "items": {},
   "recipes": {},
   "defaults": {

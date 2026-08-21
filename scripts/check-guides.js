@@ -16,7 +16,7 @@ import { allMethodGuides, METHOD_CONFIRMED } from '../src/sources/urls.js';
 
 const USER_AGENT =
   process.env.GUIDE_USER_AGENT ??
-  'HeraldBot/0.1 (private WoW guild Discord bot; link checker; contact via repository owner)';
+  'SleepwalkersQuartermaster/0.1 (private WoW guild Discord bot; link checker; contact via repository owner)';
 
 // One request every second or so. There are 39 of them; there is no hurry, and
 // hammering someone else's site to save half a minute is rude.

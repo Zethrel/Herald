@@ -1,8 +1,8 @@
-// The sites whose recommendations Herald will repeat.
+// The sites whose recommendations the Quartermaster will repeat.
 //
 // It repeats them, it does not adopt them: every entry keeps the source's name,
 // the page it came from and when it was read, and nothing here is ever
-// presented as Herald's own advice. That is the difference between quoting a
+// presented as the bot's own advice. That is the difference between quoting a
 // guide and laundering it.
 
 // Icy Veins and Wowhead were considered and dropped, and the reason is worth

@@ -11,6 +11,8 @@
 
 import { PermissionsBitField, PermissionFlagsBits as P } from 'discord.js';
 
+import { BOT_NAME } from '../src/branding.js';
+
 // Why each one is needed, so nobody has to guess when trimming the list.
 const NEEDED = [
   [P.ManageRoles, 'create the ranks and hand them out'],
@@ -41,7 +43,7 @@ if (!clientId) {
 
 const permissions = new PermissionsBitField(NEEDED.map(([bit]) => bit));
 
-console.log(`\nInvite Herald with this link:\n`);
+console.log(`\nInvite ${BOT_NAME} with this link:\n`);
 console.log(
   `https://discord.com/oauth2/authorize?client_id=${clientId}&scope=bot%20applications.commands&permissions=${permissions.bitfield}\n`,
 );
@@ -50,5 +52,5 @@ for (const [bit, why] of NEEDED) {
   console.log(`  ${new PermissionsBitField(bit).toArray()[0].padEnd(19)} ${why}`);
 }
 console.log(
-  '\nAfter inviting, drag Herald\'s role above the ranks it manages\n(Server Settings → Roles), or it cannot hand them out.\n',
+  `\nAfter inviting, drag its role above the ranks it manages\n(Server Settings → Roles), or it cannot hand them out.\n`,
 );

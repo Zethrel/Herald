@@ -1,4 +1,4 @@
-# Herald tier data — fill in the blanks, then:
+# Quartermaster tier data — fill in the blanks, then:
 #
 #   npm run import-tier -- tiers/current.txt --dry   (check it read you right)
 #   npm run import-tier -- tiers/current.txt

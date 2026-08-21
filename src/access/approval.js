@@ -1,6 +1,6 @@
 // Which servers this bot is allowed to run in.
 //
-// The licence says who may use Herald; this is the half that enforces it at
+// The licence says who may use the Quartermaster; this is the half that enforces it at
 // runtime. Anyone with the invite link can add a bot to a server they own --
 // Discord offers no way to stop that — so the bot has to notice, report, and
 // (by default) leave again.

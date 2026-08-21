@@ -1,4 +1,4 @@
-# Herald
+# Sleepwalkers Quartermaster
 
 A Discord bot for a World of Warcraft raiding guild.
 
@@ -18,13 +18,22 @@ one place — `src/ranks/membership.js` — and it holds for joins, for the
 `/rank backfill` sweep, and for `/setup run` on a server that has been running
 for years.
 
-**It only runs where it is allowed to.** Herald is private: it works in the
+**It only runs where it is allowed to.** The Quartermaster is private: it works in the
 servers on its allowlist and reports itself to its owners anywhere else. See
 [Approved servers](#approved-servers) and [Licence](#licence).
 
-> The name is provisional. It lives in exactly one place — `BOT_NAME` in
-> `.env`, falling back to `src/branding.js` — so renaming Herald later is one
-> line and touches nothing else.
+> Named for the guild it was built for, and for the job: a quartermaster runs
+> the roster and the provisions. The name lives in one place — `BOT_NAME` and
+> `BOT_SHORT_NAME` in `.env`, falling back to `src/branding.js` — so another
+> guild can rebrand it with two lines and no code changes.
+>
+> The repository is still called `herald`, which was the working name. That is
+> only a URL; nothing reads it.
+>
+> What `BOT_NAME` does **not** change: the username in the member list, which
+> comes from the Developer Portal (your app → General Information → Name), and
+> a per-server nickname, which overrides even that. Three separate places, and
+> only one of them is in this repository.
 
 ## What a set-up server looks like
 
@@ -260,7 +269,7 @@ recipe that yields 2 is 5 crafts, 15 of the first herb, and one flask spare.
 
 ### Where the answers come from
 
-**Herald does not know what the current tier wants, and does not pretend to.**
+**The Quartermaster does not know what the current tier wants, and does not pretend to.**
 Everything above is driven by [`tiers/current.json`](tiers/current.json), which
 ships empty. An unfilled slot renders as *not set for this tier* — never as a
 plausible-looking guess, because a guessed reagent list costs real gold.
@@ -294,7 +303,7 @@ slot:flask item:... source:...` overrides it for that server only, and
 
 ### What Method says
 
-Herald follows one guide: [Method](https://www.method.gg/). Icy Veins and
+The Quartermaster follows one guide: [Method](https://www.method.gg/). Icy Veins and
 Wowhead were considered and dropped, and the reason is recorded in
 `src/sources/registry.js` so nobody re-litigates it: both mint a **new URL every
 tier**, so there is no stable page to follow. A source needs a durable address
@@ -319,17 +328,17 @@ Alongside Method there is a second "source": **the guild's own call**. It exists
 so that a decision to depart from the guide is *visible* rather than silent —
 `/consumables compare` with no spec lists exactly where the two differ.
 
-**Where Method is the only voice, Herald uses it.** It sits above the generic
+**Where Method is the only voice, the Quartermaster uses it.** It sits above the generic
 stat defaults in the chain, since a guide that looked at this exact spec beats
 "all intellect casters use X", and below anything a person wrote deliberately.
 
-**Where a recorded guild view contradicts it, Herald picks neither** and falls
+**Where a recorded guild view contradicts it, the Quartermaster picks neither** and falls
 through to the tier file's own defaults. Recording a disagreement *marks* it; it
 does not decide it. To actually decide, use `/consumables set` — that is an
 override and outranks everything.
 
 Every quoted line keeps Method's name, the page URL and when it was read. This
-is someone else's editorial judgement; Herald repeats it with attribution rather
+is someone else's editorial judgement; the Quartermaster repeats it with attribution rather
 than absorbing it.
 
 ### Getting it in: fill in the blanks
@@ -399,7 +408,7 @@ That command takes effect immediately, for that server, without touching the
 file or restarting — same store as `/consumables set`. The text file stays the
 version-controlled baseline; runtime corrections live alongside it and win.
 
-Herald will not fill a stat priority in on its own. It cannot: which secondary a
+The Quartermaster will not fill a stat priority in on its own. It cannot: which secondary a
 spec stacks is a judgement about that spec's build, and inventing one is exactly
 the guess this whole file refuses to make. What it does instead is notice the
 moment a raid needs one and hand you the one-line fix. Item names may
@@ -517,7 +526,7 @@ degraded commands, just no prices.
 
 ## Approved servers
 
-Herald is not public. The licence says who may use it; this is the half that
+The Quartermaster is not public. The licence says who may use it; this is the half that
 enforces it while the bot is running, because Discord itself offers no way to
 stop someone adding a bot to a server they own.
 
@@ -649,7 +658,7 @@ order and the bot fights itself. There is a test named after this case.
 ## Licence
 
 **Not open source.** Source-available: you can read this repository, and that is
-all reading it grants you. Running Herald — or a modified or re-branded copy of
+all reading it grants you. Running the Quartermaster — or a modified or re-branded copy of
 it — requires a written grant from the copyright holder, and that grant can be
 withdrawn. No redistribution, no resale, no hosting it for anyone else.
 
