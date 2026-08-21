@@ -70,6 +70,7 @@ needs editing.
 | `/config rank <rank> <role>` | Points a rank at a role the server already has. |
 | `/config emoji <rank> <emoji>` | Changes the reaction for a self-serve rank. |
 | `/config behaviour ...` | Exclusive ranks on/off, default-rank-removal on/off. |
+| `/config channel <slot> <channel>` | Point a channel slot at a channel you already have. |
 | `/config view` | The current configuration. |
 | `/rank backfill [confirm]` | Gives the default rank to members who have **no** rank at all. Reports and does nothing without `confirm:true`. |
 | `/raid create <title> <when>` | Posts a signup for a raid night (Manage Server). |
@@ -107,6 +108,32 @@ it did not make, and it never changes a member's roles.
 
 If your ranks are named something else entirely, bind them by hand with
 `/config rank` and then run setup — it will keep those bindings.
+
+### A server that already has its channels
+
+The channel adoption above is deliberately narrow: a channel is only adopted
+when its name matches **and** it already sits in the matching category. A
+`#raid-signups` living under a category called `RAIDING` is not the same thing
+as the blueprint's, and guessing that it is would be how a bot quietly takes
+over somebody's server.
+
+So for an established server, tell it what you already have instead:
+
+```
+/setup run create_channels:false          ranks only, no channels touched
+/config channel slot:welcome channel:#introductions
+/config channel slot:raid-signups channel:#signups
+/welcome post channel:#introductions
+```
+
+Only two slots change behaviour — **welcome** (where the rank picker lives) and
+**raid-signups** (where `/raid create` posts by default). The other thirteen
+exist so `/setup run` knows what to build on a bare server; on yours they can
+stay unbound.
+
+`/config view` shows what is bound. If a first run already created channels you
+did not want, delete them in Discord and bind yours — the bot re-reads what
+exists on the next `/setup run`, and nothing it created is load-bearing.
 
 ## Raid signups
 
@@ -552,7 +579,7 @@ It refuses to start without `OWNER_IDS`: a bot that cannot tell anyone about an
 unapproved invite is worse than one that will not boot.
 
 ```sh
-npm test                  # 306 tests, no network needed
+npm test                  # 308 tests, no network needed
 ```
 
 ### Discord Developer Portal

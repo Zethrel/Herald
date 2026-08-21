@@ -4,6 +4,7 @@ import { describe, it } from 'node:test';
 import { buildWelcomeEmbed, welcomeReactions } from '../src/welcome.js';
 import { commandPayload } from '../src/commands/index.js';
 import { defaultGuildConfig } from '../src/store.js';
+import { allChannels } from '../src/blueprint.js';
 
 function configured() {
   const config = defaultGuildConfig();
@@ -77,5 +78,29 @@ describe('command definitions', () => {
       const command = payload.find((entry) => entry.name === name);
       assert.ok(!command.default_member_permissions, `${name} should be open`);
     }
+  });
+});
+
+describe('binding to a server that already has channels', () => {
+  it('offers a slot for every channel the blueprint knows about', () => {
+    const payload = commandPayload();
+    const slot = payload
+      .find((command) => command.name === 'config')
+      .options.find((option) => option.name === 'channel')
+      .options.find((option) => option.name === 'slot');
+
+    assert.equal(slot.choices.length, allChannels().length);
+    assert.ok(slot.choices.length <= 25, 'Discord allows 25 choices');
+    // The label has to disambiguate: there is more than one plausible "general".
+    assert.ok(slot.choices.every((choice) => choice.name.includes('—')));
+    assert.ok(slot.choices.some((choice) => choice.value === 'welcome'));
+  });
+
+  it('lets setup skip channel creation entirely', () => {
+    const run = commandPayload()
+      .find((command) => command.name === 'setup')
+      .options.find((option) => option.name === 'run');
+
+    assert.ok(run.options.some((option) => option.name === 'create_channels'));
   });
 });

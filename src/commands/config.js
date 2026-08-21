@@ -6,11 +6,23 @@ import {
   SlashCommandBuilder,
 } from 'discord.js';
 
+import { ChannelType } from 'discord.js';
+
 import { BRAND_COLOR, FOOTER } from '../branding.js';
-import { RANKS, SELF_ASSIGN_RANKS } from '../blueprint.js';
+import { CATEGORIES, RANKS, SELF_ASSIGN_RANKS, allChannels } from '../blueprint.js';
 import { normalizeEmoji } from '../ranks/selfAssign.js';
 
 const rankChoices = RANKS.map((rank) => ({ name: rank.name, value: rank.key }));
+
+const BLUEPRINT_CHANNELS = allChannels();
+const categoryName = (key) => CATEGORIES.find((entry) => entry.key === key)?.name ?? key;
+
+// 15 slots, inside Discord's 25-choice cap. The label names the category too,
+// because "general" alone does not say which one.
+const channelChoices = BLUEPRINT_CHANNELS.map((channel) => ({
+  name: `${channel.name} — ${categoryName(channel.categoryKey)}`.slice(0, 100),
+  value: channel.key,
+}));
 const selfAssignChoices = SELF_ASSIGN_RANKS.map((rank) => ({ name: rank.name, value: rank.key }));
 
 export const data = new SlashCommandBuilder()
@@ -59,6 +71,25 @@ export const data = new SlashCommandBuilder()
           .setDescription('Take the default rank away once a rank is picked (default: on)'),
       ),
   )
+  .addSubcommand((sub) =>
+    sub
+      .setName('channel')
+      .setDescription('Point one of the bot\'s channel slots at a channel you already have')
+      .addStringOption((option) =>
+        option
+          .setName('slot')
+          .setDescription('Which of the bot\'s channels')
+          .setRequired(true)
+          .addChoices(...channelChoices),
+      )
+      .addChannelOption((option) =>
+        option
+          .setName('channel')
+          .setDescription('The channel to use for it')
+          .setRequired(true)
+          .addChannelTypes(ChannelType.GuildText, ChannelType.GuildVoice),
+      ),
+  )
   .addSubcommand((sub) => sub.setName('view').setDescription('Show the current configuration'));
 
 export async function execute(interaction, { store }) {
@@ -83,6 +114,34 @@ export async function execute(interaction, { store }) {
       content: `**${RANKS.find((rank) => rank.key === rankKey).name}** now means <@&${role.id}>. Existing holders keep it; nothing was reassigned.`,
       flags: MessageFlags.Ephemeral,
       allowedMentions: { parse: [] },
+    });
+  }
+
+  if (sub === 'channel') {
+    const slot = interaction.options.getString('slot');
+    const channel = interaction.options.getChannel('channel');
+    const wanted = BLUEPRINT_CHANNELS.find((entry) => entry.key === slot);
+
+    // A voice slot pointed at a text channel would fail later, in a place that
+    // does not explain itself.
+    const isVoice = channel.type === ChannelType.GuildVoice;
+    if ((wanted.type === 'voice') !== isVoice) {
+      return interaction.reply({
+        content: `**${wanted.name}** is a ${wanted.type} channel, but <#${channel.id}> is ${isVoice ? 'voice' : 'text'}.`,
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+
+    await store.update(interaction.guildId, { channels: { [slot]: channel.id } });
+
+    return interaction.reply({
+      content: [
+        `**${wanted.name}** now means <#${channel.id}>.`,
+        slot === 'welcome'
+          ? 'Run `/welcome post` to put the rank picker there.'
+          : '`/setup run` will use it instead of creating one.',
+      ].join('\n'),
+      flags: MessageFlags.Ephemeral,
     });
   }
 
@@ -146,6 +205,7 @@ function renderConfig(config) {
     .setTitle('Configuration')
     .addFields(
       { name: 'Ranks', value: ranks },
+      { name: 'Channels', value: channelSummary(config) },
       { name: 'Welcome reactions', value: reactions },
       {
         name: 'Behaviour',
@@ -157,6 +217,22 @@ function renderConfig(config) {
       },
     )
     .setFooter({ text: FOOTER });
+}
+
+function channelSummary(config) {
+  const bound = BLUEPRINT_CHANNELS.filter((channel) => config.channels?.[channel.key]);
+  if (bound.length === 0) return '_none bound — run `/setup run` or `/config channel`_';
+
+  // The two that change behaviour are worth naming; the rest are structure.
+  const notable = ['welcome', 'raidSignups'];
+  const lines = bound
+    .filter((channel) => notable.includes(channel.key))
+    .map((channel) => `**${channel.name}** → <#${config.channels[channel.key]}>`);
+
+  const others = bound.length - lines.length;
+  if (others > 0) lines.push(`_and ${others} more bound_`);
+
+  return lines.join('\n');
 }
 
 function roleProblem(role, guild) {

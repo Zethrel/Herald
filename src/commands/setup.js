@@ -28,6 +28,11 @@ export const data = new SlashCommandBuilder()
         option
           .setName('enforce_permissions')
           .setDescription('Also rewrite permissions on channels that already existed (default: leave them alone)'),
+      )
+      .addBooleanOption((option) =>
+        option
+          .setName('create_channels')
+          .setDescription('Create the channel structure (default: yes). Set false on a server that already has one'),
       ),
   )
   .addSubcommand((sub) =>
@@ -65,6 +70,9 @@ export async function execute(interaction, { store, client }) {
 
   const dryRun = interaction.options.getBoolean('dry_run') ?? false;
   const enforcePermissions = interaction.options.getBoolean('enforce_permissions') ?? false;
+  // An established server has its own channels; it wants the ranks and nothing
+  // else touched.
+  const createChannels = interaction.options.getBoolean('create_channels') ?? true;
 
   // Creating a dozen channels takes longer than the three seconds Discord gives
   // us to answer, so acknowledge first and edit the reply when it is done.
@@ -78,6 +86,7 @@ export async function execute(interaction, { store, client }) {
     store,
     dryRun,
     enforcePermissions,
+    createChannels,
   });
 
   const embed = new EmbedBuilder()

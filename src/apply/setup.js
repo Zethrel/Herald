@@ -42,8 +42,17 @@ function snapshotChannels(guild) {
  * @param {object} input.store
  * @param {boolean} [input.dryRun] report what would happen, change nothing
  * @param {boolean} [input.enforcePermissions] also rewrite overwrites on adopted channels
+ * @param {boolean} [input.createChannels] false on a server that already has its own
  */
-export async function applySetup({ guild, client, config, store, dryRun = false, enforcePermissions = false }) {
+export async function applySetup({
+  guild,
+  client,
+  config,
+  store,
+  dryRun = false,
+  enforcePermissions = false,
+  createChannels = true,
+}) {
   const report = {
     dryRun,
     roles: [],
@@ -89,6 +98,18 @@ export async function applySetup({ guild, client, config, store, dryRun = false,
   // --- Categories and channels ------------------------------------------------
 
   await guild.channels.fetch();
+
+  // A server that already has its own channels wants the ranks and nothing
+  // else: whatever /config channel bound stays bound, and the welcome message
+  // still goes wherever it was pointed.
+  if (!createChannels) {
+    if (dryRun) return report;
+
+    const nextConfig = await store.get(guild.id);
+    await store.update(guild.id, { setupAt: new Date().toISOString() });
+    await postWelcome({ guild, client, config: nextConfig, store, report });
+    return report;
+  }
   const channelPlan = planChannels({
     existing: snapshotChannels(guild),
     bound: { categories: config.categories, channels: config.channels },
@@ -151,7 +172,7 @@ export async function applySetup({ guild, client, config, store, dryRun = false,
 
   if (dryRun) return report;
 
-  let nextConfig = await store.update(guild.id, {
+  const nextConfig = await store.update(guild.id, {
     categories: categoryIds,
     channels: channelIds,
     setupAt: new Date().toISOString(),
@@ -159,21 +180,27 @@ export async function applySetup({ guild, client, config, store, dryRun = false,
 
   // --- Welcome message --------------------------------------------------------
 
-  const welcomeChannelId = nextConfig.welcome.channelId ?? channelIds.welcome;
+  await postWelcome({ guild, client, config: nextConfig, store, report });
+  return report;
+}
+
+/** Post or refresh the rank picker, wherever this server keeps it. */
+async function postWelcome({ guild, client, config, store, report }) {
+  const welcomeChannelId = config.welcome?.channelId ?? config.channels?.welcome;
   const welcomeChannel = welcomeChannelId ? guild.channels.cache.get(welcomeChannelId) : null;
 
   if (!welcomeChannel) {
-    report.warnings.push('No welcome channel to post in — run `/welcome post` once one exists.');
-    return report;
+    report.warnings.push(
+      'No welcome channel bound — point one at an existing channel with `/config channel slot:welcome`, then run `/welcome post`.',
+    );
+    return;
   }
 
-  const message = await publishWelcome({ channel: welcomeChannel, config: nextConfig, guild, client });
-  nextConfig = await store.update(guild.id, {
+  const message = await publishWelcome({ channel: welcomeChannel, config, guild, client });
+  await store.update(guild.id, {
     welcome: { channelId: welcomeChannel.id, messageId: message.id },
   });
   report.welcome = { channelId: welcomeChannel.id, messageId: message.id };
-
-  return report;
 }
 
 /**
