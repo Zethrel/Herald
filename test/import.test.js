@@ -265,3 +265,54 @@ describe('alternatives and "none" in the text format', () => {
     assert.equal(parsed.defaults.all.food, 'feast-of-meat-fish');
   });
 });
+
+describe('the slots beyond the core four', () => {
+  it('reads a health potion, a mana potion and an augment rune', () => {
+    const parsed = parseTierText(
+      'holy priest: health potion = Concentrated Silvermoon Health Potion; mana potion = Lightfused Mana Potion; rune = Void-Touched Augment Rune',
+    );
+
+    assert.equal(parsed.errors.length, 0);
+    assert.deepEqual(parsed.specs['priest.holy'], {
+      healthPotion: 'concentrated-silvermoon-health-potion',
+      manaPotion: 'lightfused-mana-potion',
+      rune: 'void-touched-augment-rune',
+    });
+  });
+
+  it('takes the short forms people type', () => {
+    const parsed = parseTierText('fire mage: health = A; mana = B; augment = C');
+
+    assert.deepEqual(parsed.specs['mage.fire'], { healthPotion: 'a', manaPotion: 'b', rune: 'c' });
+  });
+
+  it('names the slots in English when someone mistypes one', () => {
+    const parsed = parseTierText('fire mage: sandwich = A');
+
+    assert.equal(parsed.specs['mage.fire'], undefined);
+    assert.match(parsed.errors[0].reason, /health potion/);
+    // Not `healthPotion`: nobody should have to type an object key.
+    assert.ok(!parsed.errors[0].reason.includes('healthPotion'));
+  });
+});
+
+describe('a note on a spec', () => {
+  it('is kept as text rather than turned into an item', () => {
+    const parsed = parseTierText(
+      'protection paladin: oil = Thalassian Phoenix Oil | Rite of Sanctification; note = Phoenix Oil for Templar, Rite for Lightsmith',
+    );
+
+    assert.equal(parsed.specs['paladin.protection'].note, 'Phoenix Oil for Templar, Rite for Lightsmith');
+    // A note is not something anyone buys, so it must not reach the catalogue.
+    assert.ok(!Object.keys(parsed.items).some((slug) => slug.includes('templar')));
+  });
+
+  it('reaches the resolved answer, which is the only reason to record it', () => {
+    const parsed = parseTierText('enhancement shaman: oil = none; note = Windfury and Flametongue instead');
+    const dataset = applyImport(normalizeDataset({}), parsed);
+    const resolved = resolveSpecConsumables({ spec: specByKey('shaman.enhancement'), dataset });
+
+    assert.equal(resolved.slots.oil.none, true);
+    assert.equal(resolved.note, 'Windfury and Flametongue instead');
+  });
+});

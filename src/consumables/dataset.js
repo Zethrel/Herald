@@ -8,14 +8,41 @@
 
 import { readFile } from 'node:fs/promises';
 
-export const SLOTS = ['flask', 'food', 'potion', 'oil'];
+export const SLOTS = ['flask', 'food', 'potion', 'healthPotion', 'manaPotion', 'oil', 'rune'];
 
 export const SLOT_LABELS = {
   flask: 'Flask',
   food: 'Food buff',
   potion: 'Combat potion',
+  healthPotion: 'Health potion',
+  manaPotion: 'Mana potion',
   oil: 'Weapon oil',
+  rune: 'Augment rune',
 };
+
+/**
+ * The slots every raider is expected to turn up with, and the only ones a gap
+ * is reported for.
+ *
+ * The rest are real, and get carried, but they are conditional: a mana potion
+ * is a healer's business, an augment rune is not something every guide bothers
+ * to state, and a health potion is a personal preference more than a raid buff.
+ * Listing them as "not set for this tier" for the thirty-odd specs they do not
+ * apply to would bury the four that matter, so an unanswered optional slot
+ * simply is not rendered.
+ */
+export const REQUIRED_SLOTS = ['flask', 'food', 'potion', 'oil'];
+
+export const OPTIONAL_SLOTS = SLOTS.filter((slot) => !REQUIRED_SLOTS.includes(slot));
+
+/**
+ * Whether a slot got an answer at all. `none` counts: "there is no weapon oil
+ * for mastery this tier" is an answer, and treating it as a gap would send
+ * people looking for something that does not exist.
+ */
+export function isAnswered(slot) {
+  return Boolean(slot?.item) || Boolean(slot?.none);
+}
 
 // Modern flasks give a secondary stat, not a primary one, so which flask a spec
 // wants follows its stat priority rather than its class. That priority is a

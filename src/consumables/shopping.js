@@ -5,7 +5,7 @@
 // count is driven by whole crafts, not by the number of flasks wanted -- ask
 // for 25 flasks from a recipe that yields 2 and you buy mats for 13 crafts.
 
-import { SLOTS, resolveItem } from './dataset.js';
+import { REQUIRED_SLOTS, SLOTS, isAnswered, resolveItem } from './dataset.js';
 import { resolveSpecConsumables } from './resolve.js';
 
 /**
@@ -44,6 +44,14 @@ export function parseRoster(text, { findSpec }) {
   return { entries, unknown };
 }
 
+/**
+ * The three a raid buys in bulk, and the numbers a raid night actually goes
+ * through. The other slots are deliberately absent rather than set to zero:
+ * a weapon oil lasts an evening, an augment rune lasts an hour, and a health
+ * potion is whatever someone already has in their bags -- guessing at how many
+ * of those to buy would put gold on the list that nobody asked for. Anything
+ * with a number here gets bought; anything without is left to the raider.
+ */
 export const DEFAULT_PER_RAIDER = { flask: 1, food: 2, potion: 8 };
 
 /**
@@ -71,7 +79,9 @@ export function buildShoppingList({
     for (const slot of SLOTS) {
       const { item } = resolved.slots[slot];
       if (!item) {
-        empty.push(slot);
+        // Only the four a raider is expected to bring. An optional slot nobody
+        // filled in is not a hole in the list, and `none` is an answer.
+        if (REQUIRED_SLOTS.includes(slot) && !isAnswered(resolved.slots[slot])) empty.push(slot);
         continue;
       }
 

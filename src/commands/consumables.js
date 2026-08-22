@@ -7,7 +7,15 @@ import {
 } from 'discord.js';
 
 import { BRAND_COLOR, FOOTER } from '../branding.js';
-import { SECONDARY_ALIASES, SECONDARY_STATS, SLOTS, SLOT_LABELS, coverage, isStale } from '../consumables/dataset.js';
+import {
+  REQUIRED_SLOTS,
+  SECONDARY_ALIASES,
+  SECONDARY_STATS,
+  SLOTS,
+  SLOT_LABELS,
+  coverage,
+  isStale,
+} from '../consumables/dataset.js';
 import { SPECS, SPEC_KEYS, findSpec, specByKey } from '../game/specs.js';
 import { DEFAULT_PER_RAIDER, buildShoppingList, parseRoster } from '../consumables/shopping.js';
 import { formatMoney, priceLines } from '../prices/auctions.js';
@@ -340,7 +348,13 @@ function renderSlots(resolved) {
     // Three different states, and conflating them is how a raider ends up
     // hunting for something that does not exist.
     if (none) return `**${SLOT_LABELS[slot]}** — _none this tier_`;
-    if (!item) return `**${SLOT_LABELS[slot]}** — _not set for this tier_`;
+    if (!item) {
+      // An unanswered optional slot is left out rather than announced: a melee
+      // spec has no mana potion and never will, and a line saying so on every
+      // reply is noise, not information.
+      if (!REQUIRED_SLOTS.includes(slot)) return null;
+      return `**${SLOT_LABELS[slot]}** — _not set for this tier_`;
+    }
 
     const link = item.itemId
       ? ` ([wowhead](https://www.wowhead.com/item=${item.itemId}))`
@@ -362,7 +376,9 @@ function renderSlots(resolved) {
       alternatives?.length > 0 ? ` _or ${alternatives.map((entry) => entry.name).join(', ')}_` : '';
 
     return `**${SLOT_LABELS[slot]}** — ${item.name}${link}${others}${note}${mine}${guides}`;
-  }).join('\n');
+  })
+    .filter(Boolean)
+    .join('\n');
 }
 
 function tierLine(dataset) {
@@ -455,6 +471,10 @@ function showCompare(interaction, { dataset, reports }) {
 
   for (const slot of SLOTS) {
     const { opinions, agreement } = slots[slot];
+
+    // Same rule as the lookup: an optional slot nobody has an opinion on does
+    // not earn a field saying so.
+    if (opinions.length === 0 && !REQUIRED_SLOTS.includes(slot)) continue;
 
     embed.addFields({
       name: `${SLOT_LABELS[slot]} — ${AGREEMENT_LABELS[agreement]}`,

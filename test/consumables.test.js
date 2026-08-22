@@ -2,7 +2,16 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { SPECS, SPEC_KEYS, findSpec, specByKey } from '../src/game/specs.js';
-import { coverage, isStale, normalizeDataset, resolveItem } from '../src/consumables/dataset.js';
+import {
+  OPTIONAL_SLOTS,
+  REQUIRED_SLOTS,
+  SLOTS,
+  SLOT_LABELS,
+  coverage,
+  isStale,
+  normalizeDataset,
+  resolveItem,
+} from '../src/consumables/dataset.js';
 import { buildShoppingList, parseRoster } from '../src/consumables/shopping.js';
 import { gaps, resolveSpecConsumables } from '../src/consumables/resolve.js';
 
@@ -49,7 +58,7 @@ describe('the spec catalogue', () => {
   it('covers every class with unique keys', () => {
     assert.equal(new Set(SPEC_KEYS).size, SPEC_KEYS.length);
     assert.equal(new Set(SPECS.map((spec) => spec.className)).size, 13);
-    assert.equal(SPECS.length, 39);
+    assert.equal(SPECS.length, 40);
   });
 
   it('gives every spec a role and a primary stat', () => {
@@ -492,5 +501,47 @@ describe('a roster that brings an unconfigured spec', () => {
     const [entry] = list.missingSlots;
     assert.equal(entry.noSecondary, false);
     assert.deepEqual(entry.slots, ['potion', 'oil']);
+  });
+});
+
+describe('the slots a raider is actually asked for', () => {
+  it('splits the catalogue into the four expected and the rest', () => {
+    assert.deepEqual(REQUIRED_SLOTS, ['flask', 'food', 'potion', 'oil']);
+    assert.deepEqual([...REQUIRED_SLOTS, ...OPTIONAL_SLOTS].sort(), [...SLOTS].sort());
+    assert.equal(SLOTS.every((slot) => SLOT_LABELS[slot]), true);
+  });
+
+  const tier = normalizeDataset({
+    items: { flask: { name: 'F' }, food: { name: 'D' }, potion: { name: 'P' } },
+    specs: {
+      // Everything a raider is asked for, and no oil this tier.
+      'mage.fire': { flask: 'flask', food: 'food', potion: 'potion', oil: 'none' },
+    },
+  });
+
+  it('counts an explicit "none" as answered, not as a hole', () => {
+    const fire = resolveSpecConsumables({ spec: specByKey('mage.fire'), dataset: tier });
+
+    // "There is no oil for mastery this tier" is an answer. Reporting it as a
+    // gap sends someone looking for an item that does not exist.
+    assert.equal(fire.complete, true);
+    assert.deepEqual(gaps({ specs: [specByKey('mage.fire')], dataset: tier }), []);
+  });
+
+  it('does not ask a melee spec for a mana potion', () => {
+    const fire = resolveSpecConsumables({ spec: specByKey('mage.fire'), dataset: tier });
+
+    assert.equal(fire.slots.manaPotion.item, null);
+    assert.equal(fire.complete, true);
+  });
+
+  it('leaves an optional slot out of the shopping list gaps', () => {
+    const list = buildShoppingList({
+      roster: [{ spec: specByKey('mage.fire'), count: 5 }],
+      dataset: tier,
+      perRaider: { flask: 1 },
+    });
+
+    assert.deepEqual(list.missingSlots, []);
   });
 });

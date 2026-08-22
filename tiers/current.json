@@ -5,19 +5,661 @@
     "patch": null,
     "expansion": null
   },
-  "updatedAt": null,
+  "updatedAt": "2026-08-22T00:25:38.018Z",
   "staleAfterDays": 90,
-  "sources": [],
-  "note": "Nothing is filled in yet. The Quartermaster refuses to invent consumables: an empty slot renders as 'not set for this tier' rather than a guess. See example.json for the shape. Fill in `items` (a name and \"craft\": true is enough) plus `defaults`/`specs` from a source you trust, put the link in `sources`, then run `npm run sync-tier` to have Blizzard's API fill in the item ids, craft yields and reagents. `reports` is what Method's guide says, per spec; /consumables compare shows it against the guild's own recorded view, and the bot uses it only where nothing more specific answers.",
-  "items": {},
+  "sources": [
+    {
+      "id": "guild-table",
+      "name": "The guild's own spec table",
+      "url": null,
+      "file": "tiers/sources/spec-consumables.md",
+      "note": "Transcribed by scripts/import-table.js. Nothing in it was inferred except which slot each item belongs in, which the script prints for review."
+    }
+  ],
+  "note": "Filled in from the guild's own spec-by-spec table, kept at tiers/sources/spec-consumables.md. To change what a spec is told to bring, edit its line in tiers/current.txt and run `npm run import-tier -- tiers/current.txt`; to re-read the whole table, run `npm run import-table -- tiers/sources/spec-consumables.md --prelude tiers/defaults.txt --out tiers/current.txt` first. `npm run sync-tier` then fills in item ids, craft yields and reagents from Blizzard. Item ids are empty until that runs, so the shopping list has names but no prices yet. An officer can override any single answer at runtime with `/consumables set`, which outranks this file.",
+  "items": {
+    "harandar-celebration": {
+      "name": "Harandar Celebration",
+      "craft": true
+    },
+    "light-s-potential": {
+      "name": "Light's Potential",
+      "craft": true
+    },
+    "flask-of-the-shattered-sun": {
+      "name": "Flask of the Shattered Sun",
+      "craft": true
+    },
+    "thalassian-phoenix-oil": {
+      "name": "Thalassian Phoenix Oil",
+      "craft": true
+    },
+    "flask-of-the-blood-knights": {
+      "name": "Flask of the Blood Knights",
+      "craft": true
+    },
+    "flask-of-the-magisters": {
+      "name": "Flask of the Magisters",
+      "craft": true
+    },
+    "flask-of-thalassian-resistance": {
+      "name": "Flask of Thalassian Resistance",
+      "craft": true
+    },
+    "royal-roast": {
+      "name": "Royal Roast",
+      "craft": true
+    },
+    "potion-of-recklessness": {
+      "name": "Potion of Recklessness",
+      "craft": true
+    },
+    "concentrated-healing-potion": {
+      "name": "Concentrated Healing Potion",
+      "craft": true
+    },
+    "void-touched-augment-rune": {
+      "name": "Void-Touched Augment Rune",
+      "craft": true
+    },
+    "concentrated-silvermoon-health-potion": {
+      "name": "Concentrated Silvermoon Health Potion",
+      "craft": true
+    },
+    "silvermoon-health-potion": {
+      "name": "Silvermoon Health Potion",
+      "craft": true
+    },
+    "impossibly-royal-roast": {
+      "name": "Impossibly Royal Roast",
+      "craft": true
+    },
+    "liquid-luster": {
+      "name": "Liquid Luster",
+      "craft": true
+    },
+    "draught-of-rampant-abandon": {
+      "name": "Draught of Rampant Abandon",
+      "craft": true
+    },
+    "silvermoon-parade": {
+      "name": "Silvermoon Parade",
+      "craft": true
+    },
+    "blooming-feast": {
+      "name": "Blooming Feast",
+      "craft": true
+    },
+    "lightfused-mana-potion": {
+      "name": "Lightfused Mana Potion",
+      "craft": true
+    },
+    "hearty-royal-roast": {
+      "name": "Hearty Royal Roast",
+      "craft": true
+    },
+    "hearty-silvermoon-parade": {
+      "name": "Hearty Silvermoon Parade",
+      "craft": true
+    },
+    "refulgent-weightstone": {
+      "name": "Refulgent Weightstone",
+      "craft": true
+    },
+    "hearty-harandar-celebration": {
+      "name": "Hearty Harandar Celebration",
+      "craft": true
+    },
+    "rite-of-sanctification": {
+      "name": "Rite of Sanctification",
+      "craft": true
+    },
+    "potion-of-devoured-dreams": {
+      "name": "Potion of Devoured Dreams",
+      "craft": true
+    },
+    "warped-wise-wings": {
+      "name": "Warped Wise Wings",
+      "craft": true
+    },
+    "fel-kissed-filet": {
+      "name": "Fel-Kissed Filet",
+      "craft": true
+    },
+    "crimson-calamari": {
+      "name": "Crimson Calamari",
+      "craft": true
+    },
+    "spellfire-filet": {
+      "name": "Spellfire Filet",
+      "craft": true
+    },
+    "quel-dorei-medley": {
+      "name": "Quel'dorei Medley",
+      "craft": true
+    }
+  },
   "recipes": {},
   "defaults": {
     "intellect": {},
     "agility": {},
     "strength": {},
     "healer": {},
-    "tank": {}
+    "tank": {},
+    "all": {
+      "food": "harandar-celebration",
+      "potion": "light-s-potential"
+    },
+    "crit": {
+      "flask": "flask-of-the-shattered-sun",
+      "oil": "thalassian-phoenix-oil"
+    },
+    "haste": {
+      "flask": "flask-of-the-blood-knights",
+      "oil": "thalassian-phoenix-oil"
+    },
+    "mastery": {
+      "flask": "flask-of-the-magisters",
+      "oil": "none"
+    },
+    "versatility": {
+      "flask": "flask-of-thalassian-resistance",
+      "oil": "none"
+    }
   },
-  "specs": {},
+  "specs": {
+    "deathknight.blood": {
+      "flask": [
+        "flask-of-the-shattered-sun",
+        "flask-of-the-blood-knights"
+      ],
+      "food": [
+        "harandar-celebration",
+        "royal-roast"
+      ],
+      "potion": [
+        "potion-of-recklessness",
+        "light-s-potential"
+      ],
+      "healthPotion": "concentrated-healing-potion",
+      "oil": "thalassian-phoenix-oil",
+      "rune": "void-touched-augment-rune"
+    },
+    "deathknight.frost": {
+      "flask": "flask-of-the-magisters",
+      "food": [
+        "harandar-celebration",
+        "royal-roast"
+      ],
+      "potion": "potion-of-recklessness",
+      "healthPotion": "concentrated-silvermoon-health-potion",
+      "oil": "thalassian-phoenix-oil",
+      "rune": "void-touched-augment-rune"
+    },
+    "deathknight.unholy": {
+      "flask": "flask-of-the-magisters",
+      "food": [
+        "harandar-celebration",
+        "royal-roast"
+      ],
+      "potion": "potion-of-recklessness",
+      "healthPotion": "concentrated-silvermoon-health-potion",
+      "oil": "thalassian-phoenix-oil",
+      "rune": "void-touched-augment-rune"
+    },
+    "demonhunter.devourer": {
+      "flask": "flask-of-the-magisters",
+      "food": [
+        "harandar-celebration",
+        "royal-roast"
+      ],
+      "potion": [
+        "potion-of-recklessness",
+        "light-s-potential"
+      ],
+      "healthPotion": "concentrated-silvermoon-health-potion",
+      "oil": "thalassian-phoenix-oil",
+      "rune": "void-touched-augment-rune",
+      "note": "2\u00d7 Thalassian Phoenix Oil"
+    },
+    "demonhunter.havoc": {
+      "flask": [
+        "flask-of-the-magisters",
+        "flask-of-the-shattered-sun"
+      ],
+      "food": "harandar-celebration",
+      "potion": "potion-of-recklessness",
+      "healthPotion": "concentrated-silvermoon-health-potion",
+      "oil": "thalassian-phoenix-oil",
+      "rune": "void-touched-augment-rune",
+      "note": "2\u00d7 Thalassian Phoenix Oil"
+    },
+    "demonhunter.vengeance": {
+      "flask": "flask-of-the-blood-knights",
+      "food": "royal-roast",
+      "potion": "potion-of-recklessness",
+      "healthPotion": "silvermoon-health-potion",
+      "oil": "thalassian-phoenix-oil"
+    },
+    "druid.balance": {
+      "flask": [
+        "flask-of-the-shattered-sun",
+        "flask-of-the-magisters"
+      ],
+      "food": [
+        "royal-roast",
+        "impossibly-royal-roast"
+      ],
+      "potion": [
+        "light-s-potential",
+        "liquid-luster"
+      ],
+      "healthPotion": "concentrated-silvermoon-health-potion",
+      "oil": "thalassian-phoenix-oil"
+    },
+    "druid.feral": {
+      "flask": [
+        "flask-of-the-magisters",
+        "flask-of-the-blood-knights",
+        "flask-of-thalassian-resistance",
+        "flask-of-the-shattered-sun"
+      ],
+      "food": "harandar-celebration",
+      "potion": [
+        "light-s-potential",
+        "draught-of-rampant-abandon"
+      ],
+      "healthPotion": "concentrated-silvermoon-health-potion",
+      "oil": "thalassian-phoenix-oil",
+      "rune": "void-touched-augment-rune",
+      "note": "Harandar Celebration: any main-stat feast"
+    },
+    "druid.guardian": {
+      "flask": "flask-of-the-blood-knights",
+      "food": [
+        "harandar-celebration",
+        "silvermoon-parade"
+      ],
+      "potion": "potion-of-recklessness",
+      "healthPotion": "concentrated-silvermoon-health-potion",
+      "oil": "thalassian-phoenix-oil",
+      "rune": "void-touched-augment-rune"
+    },
+    "druid.restoration": {
+      "flask": "flask-of-the-blood-knights",
+      "food": [
+        "blooming-feast",
+        "harandar-celebration"
+      ],
+      "healthPotion": "concentrated-silvermoon-health-potion",
+      "manaPotion": [
+        "lightfused-mana-potion",
+        "light-s-potential"
+      ],
+      "oil": "thalassian-phoenix-oil"
+    },
+    "evoker.augmentation": {
+      "flask": "flask-of-the-shattered-sun",
+      "food": [
+        "harandar-celebration",
+        "silvermoon-parade"
+      ],
+      "potion": [
+        "potion-of-recklessness",
+        "light-s-potential"
+      ],
+      "healthPotion": "concentrated-silvermoon-health-potion",
+      "oil": "thalassian-phoenix-oil",
+      "rune": "void-touched-augment-rune"
+    },
+    "evoker.devastation": {
+      "flask": "flask-of-the-shattered-sun",
+      "food": [
+        "harandar-celebration",
+        "silvermoon-parade"
+      ],
+      "potion": "potion-of-recklessness",
+      "healthPotion": "concentrated-silvermoon-health-potion",
+      "oil": "thalassian-phoenix-oil",
+      "rune": "void-touched-augment-rune"
+    },
+    "evoker.preservation": {
+      "flask": "flask-of-the-magisters",
+      "food": [
+        "hearty-royal-roast",
+        "hearty-silvermoon-parade"
+      ],
+      "healthPotion": "concentrated-silvermoon-health-potion",
+      "manaPotion": [
+        "lightfused-mana-potion",
+        "light-s-potential"
+      ],
+      "oil": "thalassian-phoenix-oil",
+      "rune": "void-touched-augment-rune"
+    },
+    "hunter.beastmastery": {
+      "flask": [
+        "flask-of-the-shattered-sun",
+        "flask-of-the-magisters"
+      ],
+      "food": [
+        "harandar-celebration",
+        "silvermoon-parade",
+        "hearty-royal-roast"
+      ],
+      "potion": [
+        "potion-of-recklessness",
+        "light-s-potential"
+      ],
+      "healthPotion": "concentrated-silvermoon-health-potion",
+      "oil": "thalassian-phoenix-oil",
+      "rune": "void-touched-augment-rune"
+    },
+    "hunter.marksmanship": {
+      "flask": [
+        "flask-of-the-shattered-sun",
+        "flask-of-the-magisters"
+      ],
+      "food": [
+        "harandar-celebration",
+        "silvermoon-parade",
+        "hearty-royal-roast"
+      ],
+      "potion": [
+        "potion-of-recklessness",
+        "light-s-potential"
+      ],
+      "healthPotion": "concentrated-silvermoon-health-potion",
+      "oil": "thalassian-phoenix-oil",
+      "rune": "void-touched-augment-rune"
+    },
+    "hunter.survival": {
+      "flask": "flask-of-the-magisters",
+      "food": "silvermoon-parade",
+      "potion": "draught-of-rampant-abandon",
+      "healthPotion": "concentrated-silvermoon-health-potion",
+      "oil": [
+        "thalassian-phoenix-oil",
+        "refulgent-weightstone"
+      ],
+      "rune": "void-touched-augment-rune"
+    },
+    "mage.arcane": {
+      "flask": "flask-of-the-magisters",
+      "food": "harandar-celebration",
+      "potion": "light-s-potential",
+      "healthPotion": "silvermoon-health-potion",
+      "oil": "thalassian-phoenix-oil",
+      "rune": "void-touched-augment-rune"
+    },
+    "mage.fire": {
+      "flask": [
+        "flask-of-the-magisters",
+        "flask-of-the-blood-knights"
+      ],
+      "food": "harandar-celebration",
+      "potion": "light-s-potential",
+      "healthPotion": "concentrated-silvermoon-health-potion",
+      "oil": "thalassian-phoenix-oil",
+      "rune": "void-touched-augment-rune"
+    },
+    "mage.frost": {
+      "flask": "flask-of-the-shattered-sun",
+      "food": "harandar-celebration",
+      "potion": "potion-of-recklessness",
+      "healthPotion": "concentrated-silvermoon-health-potion",
+      "oil": "thalassian-phoenix-oil",
+      "rune": "void-touched-augment-rune"
+    },
+    "monk.brewmaster": {
+      "flask": "flask-of-thalassian-resistance",
+      "food": [
+        "silvermoon-parade",
+        "harandar-celebration"
+      ],
+      "potion": "light-s-potential",
+      "healthPotion": "silvermoon-health-potion",
+      "oil": "thalassian-phoenix-oil"
+    },
+    "monk.mistweaver": {
+      "flask": "flask-of-the-blood-knights",
+      "food": [
+        "hearty-harandar-celebration",
+        "hearty-silvermoon-parade"
+      ],
+      "potion": "light-s-potential",
+      "healthPotion": "concentrated-silvermoon-health-potion",
+      "manaPotion": "lightfused-mana-potion",
+      "oil": "thalassian-phoenix-oil",
+      "rune": "void-touched-augment-rune"
+    },
+    "monk.windwalker": {
+      "flask": [
+        "flask-of-the-blood-knights",
+        "flask-of-the-shattered-sun",
+        "flask-of-the-magisters"
+      ],
+      "food": [
+        "harandar-celebration",
+        "silvermoon-parade"
+      ],
+      "potion": "potion-of-recklessness",
+      "healthPotion": "concentrated-silvermoon-health-potion",
+      "oil": "thalassian-phoenix-oil",
+      "rune": "void-touched-augment-rune"
+    },
+    "paladin.holy": {
+      "flask": [
+        "flask-of-the-blood-knights",
+        "flask-of-the-magisters"
+      ],
+      "food": "hearty-silvermoon-parade",
+      "healthPotion": "concentrated-silvermoon-health-potion",
+      "manaPotion": "lightfused-mana-potion",
+      "oil": "thalassian-phoenix-oil"
+    },
+    "paladin.protection": {
+      "flask": "flask-of-the-blood-knights",
+      "food": [
+        "harandar-celebration",
+        "silvermoon-parade"
+      ],
+      "potion": "potion-of-recklessness",
+      "healthPotion": "concentrated-silvermoon-health-potion",
+      "oil": [
+        "thalassian-phoenix-oil",
+        "rite-of-sanctification"
+      ],
+      "rune": "void-touched-augment-rune",
+      "note": "Thalassian Phoenix Oil: Templar \u00b7 Rite of Sanctification: Lightsmith"
+    },
+    "paladin.retribution": {
+      "flask": "flask-of-the-magisters",
+      "food": "royal-roast",
+      "potion": [
+        "potion-of-recklessness",
+        "light-s-potential"
+      ],
+      "healthPotion": "silvermoon-health-potion",
+      "oil": "thalassian-phoenix-oil",
+      "rune": "void-touched-augment-rune",
+      "note": "Light's Potential: depending on highest secondary"
+    },
+    "priest.discipline": {
+      "flask": "flask-of-the-blood-knights",
+      "food": "royal-roast",
+      "potion": "light-s-potential",
+      "healthPotion": "concentrated-silvermoon-health-potion",
+      "manaPotion": [
+        "lightfused-mana-potion",
+        "potion-of-devoured-dreams"
+      ],
+      "oil": "thalassian-phoenix-oil",
+      "rune": "void-touched-augment-rune",
+      "note": "feasts"
+    },
+    "priest.holy": {
+      "flask": [
+        "flask-of-the-shattered-sun",
+        "flask-of-the-magisters"
+      ],
+      "food": "royal-roast",
+      "potion": "light-s-potential",
+      "healthPotion": "concentrated-silvermoon-health-potion",
+      "manaPotion": [
+        "lightfused-mana-potion",
+        "potion-of-devoured-dreams"
+      ],
+      "oil": "thalassian-phoenix-oil",
+      "rune": "void-touched-augment-rune",
+      "note": "feasts"
+    },
+    "priest.shadow": {
+      "flask": [
+        "flask-of-the-blood-knights",
+        "flask-of-the-magisters"
+      ],
+      "food": [
+        "warped-wise-wings",
+        "fel-kissed-filet"
+      ],
+      "potion": "potion-of-recklessness",
+      "healthPotion": "concentrated-silvermoon-health-potion",
+      "oil": "thalassian-phoenix-oil",
+      "rune": "void-touched-augment-rune",
+      "note": "any feast"
+    },
+    "rogue.assassination": {
+      "flask": "flask-of-the-blood-knights",
+      "potion": "light-s-potential",
+      "healthPotion": "silvermoon-health-potion",
+      "oil": "thalassian-phoenix-oil",
+      "rune": "void-touched-augment-rune",
+      "note": "any primary-stat feast"
+    },
+    "rogue.outlaw": {
+      "flask": [
+        "flask-of-the-shattered-sun",
+        "flask-of-the-blood-knights"
+      ],
+      "food": "harandar-celebration",
+      "potion": "light-s-potential",
+      "healthPotion": "concentrated-silvermoon-health-potion",
+      "oil": "thalassian-phoenix-oil",
+      "rune": "void-touched-augment-rune"
+    },
+    "rogue.subtlety": {
+      "flask": [
+        "flask-of-the-shattered-sun",
+        "flask-of-the-magisters"
+      ],
+      "food": [
+        "blooming-feast",
+        "crimson-calamari"
+      ],
+      "potion": "light-s-potential",
+      "healthPotion": "concentrated-silvermoon-health-potion",
+      "oil": "thalassian-phoenix-oil",
+      "rune": "void-touched-augment-rune"
+    },
+    "shaman.elemental": {
+      "flask": "flask-of-the-magisters",
+      "food": [
+        "silvermoon-parade",
+        "harandar-celebration"
+      ],
+      "potion": "light-s-potential",
+      "healthPotion": "concentrated-silvermoon-health-potion",
+      "oil": "thalassian-phoenix-oil",
+      "rune": "void-touched-augment-rune",
+      "note": "Thalassian Phoenix Oil: only without Flametongue Weapon talent"
+    },
+    "shaman.enhancement": {
+      "flask": "flask-of-the-magisters",
+      "food": "royal-roast",
+      "potion": "potion-of-recklessness",
+      "healthPotion": "silvermoon-health-potion",
+      "oil": "none",
+      "rune": "void-touched-augment-rune",
+      "note": "no weapon oil \u2014 uses Windfury Weapon + Flametongue Weapon"
+    },
+    "shaman.restoration": {
+      "flask": "flask-of-the-shattered-sun",
+      "food": "hearty-silvermoon-parade",
+      "potion": "light-s-potential",
+      "healthPotion": "silvermoon-health-potion",
+      "oil": "none",
+      "rune": "void-touched-augment-rune",
+      "note": "no weapon oil \u2014 Earthliving Weapon"
+    },
+    "warlock.affliction": {
+      "flask": "flask-of-the-shattered-sun",
+      "food": [
+        "royal-roast",
+        "harandar-celebration"
+      ],
+      "potion": "light-s-potential",
+      "healthPotion": "concentrated-silvermoon-health-potion",
+      "oil": "thalassian-phoenix-oil",
+      "rune": "void-touched-augment-rune"
+    },
+    "warlock.demonology": {
+      "flask": "flask-of-the-shattered-sun",
+      "food": "spellfire-filet",
+      "potion": "potion-of-recklessness",
+      "healthPotion": "silvermoon-health-potion",
+      "oil": "thalassian-phoenix-oil",
+      "rune": "void-touched-augment-rune"
+    },
+    "warlock.destruction": {
+      "flask": [
+        "flask-of-the-blood-knights",
+        "flask-of-the-shattered-sun"
+      ],
+      "food": [
+        "royal-roast",
+        "harandar-celebration",
+        "silvermoon-parade"
+      ],
+      "potion": [
+        "light-s-potential",
+        "potion-of-recklessness"
+      ],
+      "healthPotion": "concentrated-silvermoon-health-potion",
+      "oil": "thalassian-phoenix-oil",
+      "rune": "void-touched-augment-rune"
+    },
+    "warrior.arms": {
+      "flask": "flask-of-the-blood-knights",
+      "food": [
+        "quel-dorei-medley",
+        "silvermoon-parade"
+      ],
+      "potion": "potion-of-recklessness",
+      "healthPotion": "concentrated-silvermoon-health-potion",
+      "oil": "thalassian-phoenix-oil"
+    },
+    "warrior.fury": {
+      "flask": "flask-of-the-blood-knights",
+      "food": [
+        "quel-dorei-medley",
+        "silvermoon-parade"
+      ],
+      "potion": "light-s-potential",
+      "healthPotion": "concentrated-silvermoon-health-potion",
+      "oil": "thalassian-phoenix-oil",
+      "note": "Thalassian Phoenix Oil: on both weapons"
+    },
+    "warrior.protection": {
+      "flask": "flask-of-thalassian-resistance",
+      "food": [
+        "silvermoon-parade",
+        "harandar-celebration"
+      ],
+      "potion": "light-s-potential",
+      "healthPotion": "silvermoon-health-potion",
+      "oil": "thalassian-phoenix-oil"
+    }
+  },
   "reports": {}
 }

@@ -1,39 +1,58 @@
-# Quartermaster tier data — fill in the blanks, then:
+# Quartermaster tier data.
+#
+# This half is hand-written: the blocks that apply to more than one spec. The
+# per-spec lines below it are generated from tiers/sources/spec-consumables.md:
+#
+#   npm run import-table -- tiers/sources/spec-consumables.md \
+#     --prelude tiers/defaults.txt --out tiers/current.txt
+#
+# Then load it into the bot:
 #
 #   npm run import-tier -- tiers/current.txt --dry   (check it read you right)
 #   npm run import-tier -- tiers/current.txt
 #   npm run sync-tier                                (item ids, yields, reagents)
 #
+# Editing tiers/current.txt directly is fine too, and is the quicker way to fix
+# one spec. Regenerating overwrites it, so a change worth keeping belongs either
+# here or in the source table.
+#
 # Format:   key: slot = item name; slot = item name
-# Slots:    flask, food, potion, oil
+# Slots:    flask, food, potion, health potion, mana potion, oil, rune
+# Also:     secondary = crit|haste|mastery|versatility   (which stat picks the flask)
+#           note = free text                             (shown with the answer)
+# Alternatives are separated by | and the first one is the primary.
 # Separator is a semicolon, so item names may contain commas.
 # A dash or a blank value means "not filled in yet" and is skipped.
+# `none` means there is no such consumable this tier, which is a real answer.
 # Anything after # is a comment.
 
 
 # ---- Everyone --------------------------------------------------------------
 #
-# The lowest-priority block: applies to every spec, whatever it plays. Food and
-# the main-stat potion live here.
+# The lowest-priority block: applies to every spec, whatever it plays. It is
+# what answers for a spec whose own line leaves a slot out — an "any feast"
+# recommendation, for instance, names no item anyone can buy.
 
-# Provisional — the season has not started, so the newer feasts are not out yet.
 all: food = Harandar Celebration
-
-# Main stat is what the potion carries now, and this one is the main-stat potion
-# across the board. Some specs run Potion of Recklessness instead: give those a
-# spec line below.
 all: potion = Light's Potential
+
+# Not set here on purpose: the source table lists an augment rune for most
+# specs but not all, and filling the gaps in would be inventing agreement that
+# is not there. A guild that wants it for everyone can add one line:
+#
+#   all: rune = Void-Touched Augment Rune
 
 
 # ---- Flasks, by secondary stat ----------------------------------------------
 #
 # Modern flasks give a secondary stat, not a primary one, so the flask follows
-# the stat priority rather than the class. Each spec picks one of these with its
-# own "secondary = ..." line further down.
+# the stat priority rather than the class. Every spec below names its own flask
+# outright, so this block is the fallback for a spec that does not — give such a
+# spec a "secondary = ..." line and its flask follows from here.
 
-crit:         flask = Flask of the Shattered Sun; oil = Thalassian Phoenix Oil
-haste:        flask = Flask of the Blood Knights; oil = Thalassian Phoenix Oil
-mastery:      flask = Flask of the Magisters;      oil = none
+crit:         flask = Flask of the Shattered Sun;     oil = Thalassian Phoenix Oil
+haste:        flask = Flask of the Blood Knights;     oil = Thalassian Phoenix Oil
+mastery:      flask = Flask of the Magisters;         oil = none
 versatility:  flask = Flask of Thalassian Resistance; oil = none
 
 # Thalassian Phoenix Oil covers crit and haste, and no mastery or versatility
@@ -41,91 +60,73 @@ versatility:  flask = Flask of Thalassian Resistance; oil = none
 # this tier, rather than being shown a blank they have to go and check.
 
 
-# ---- Per role ---------------------------------------------------------------
-#
-# Role beats stat: every healer is an intellect user, so a healer line here wins
-# for healers while any stat line still covers everyone else.
-
-healer: food = -
-tank:   food = -
-
-
 # ---- Per spec ---------------------------------------------------------------
 #
-# "secondary = crit|haste|mastery|versatility" is what gives a spec its flask,
-# so uncomment one per spec you raid with. Add item slots only where the spec
-# departs from the blocks above:
-#
-#   fire mage: secondary = mastery; potion = Potion of Recklessness
-#
-# A spec that can run either of two stats takes both, and is offered both flasks:
-#
-#   outlaw rogue: secondary = crit|haste
-#
-# The link is that spec's Method page.
+# Generated from the guild's own table. Edit a line to change what a spec is
+# told to bring; the format is the same as everything above.
 
 # Death Knight
-# blood death knight        : secondary = -   # https://www.method.gg/guides/blood-death-knight/stats-races-and-consumables
-# frost death knight        : secondary = -   # https://www.method.gg/guides/frost-death-knight/stats-races-and-consumables
-# unholy death knight       : secondary = -   # https://www.method.gg/guides/unholy-death-knight/stats-races-and-consumables
+blood death knight: flask = Flask of the Shattered Sun | Flask of the Blood Knights; food = Harandar Celebration | Royal Roast; potion = Potion of Recklessness | Light's Potential; health potion = Concentrated Healing Potion; oil = Thalassian Phoenix Oil; rune = Void-Touched Augment Rune
+frost death knight: flask = Flask of the Magisters; food = Harandar Celebration | Royal Roast; potion = Potion of Recklessness; health potion = Concentrated Silvermoon Health Potion; oil = Thalassian Phoenix Oil; rune = Void-Touched Augment Rune
+unholy death knight: flask = Flask of the Magisters; food = Harandar Celebration | Royal Roast; potion = Potion of Recklessness; health potion = Concentrated Silvermoon Health Potion; oil = Thalassian Phoenix Oil; rune = Void-Touched Augment Rune
 
 # Demon Hunter
-# havoc demon hunter        : secondary = -   # https://www.method.gg/guides/havoc-demon-hunter/stats-races-and-consumables
-# vengeance demon hunter    : secondary = -   # https://www.method.gg/guides/vengeance-demon-hunter/stats-races-and-consumables
+devourer demon hunter: flask = Flask of the Magisters; food = Harandar Celebration | Royal Roast; potion = Potion of Recklessness | Light's Potential; health potion = Concentrated Silvermoon Health Potion; oil = Thalassian Phoenix Oil; rune = Void-Touched Augment Rune; note = 2× Thalassian Phoenix Oil
+havoc demon hunter: flask = Flask of the Magisters | Flask of the Shattered Sun; food = Harandar Celebration; potion = Potion of Recklessness; health potion = Concentrated Silvermoon Health Potion; oil = Thalassian Phoenix Oil; rune = Void-Touched Augment Rune; note = 2× Thalassian Phoenix Oil
+vengeance demon hunter: flask = Flask of the Blood Knights; food = Royal Roast; potion = Potion of Recklessness; health potion = Silvermoon Health Potion; oil = Thalassian Phoenix Oil
 
 # Druid
-# balance druid             : secondary = -   # https://www.method.gg/guides/balance-druid/stats-races-and-consumables
-# feral druid               : secondary = -   # https://www.method.gg/guides/feral-druid/stats-races-and-consumables
-# guardian druid            : secondary = -   # https://www.method.gg/guides/guardian-druid/stats-races-and-consumables
-# restoration druid         : secondary = -   # https://www.method.gg/guides/restoration-druid/stats-races-and-consumables
+balance druid: flask = Flask of the Shattered Sun | Flask of the Magisters; food = Royal Roast | Impossibly Royal Roast; potion = Light's Potential | Liquid Luster; health potion = Concentrated Silvermoon Health Potion; oil = Thalassian Phoenix Oil
+feral druid: flask = Flask of the Magisters | Flask of the Blood Knights | Flask of Thalassian Resistance | Flask of the Shattered Sun; food = Harandar Celebration; potion = Light's Potential | Draught of Rampant Abandon; health potion = Concentrated Silvermoon Health Potion; oil = Thalassian Phoenix Oil; rune = Void-Touched Augment Rune; note = Harandar Celebration: any main-stat feast
+guardian druid: flask = Flask of the Blood Knights; food = Harandar Celebration | Silvermoon Parade; potion = Potion of Recklessness; health potion = Concentrated Silvermoon Health Potion; oil = Thalassian Phoenix Oil; rune = Void-Touched Augment Rune
+restoration druid: flask = Flask of the Blood Knights; food = Blooming Feast | Harandar Celebration; health potion = Concentrated Silvermoon Health Potion; mana potion = Lightfused Mana Potion | Light's Potential; oil = Thalassian Phoenix Oil
 
 # Evoker
-# devastation evoker        : secondary = -   # https://www.method.gg/guides/devastation-evoker/stats-races-and-consumables
-# preservation evoker       : secondary = -   # https://www.method.gg/guides/preservation-evoker/stats-races-and-consumables
-# augmentation evoker       : secondary = -   # https://www.method.gg/guides/augmentation-evoker/stats-races-and-consumables
+augmentation evoker: flask = Flask of the Shattered Sun; food = Harandar Celebration | Silvermoon Parade; potion = Potion of Recklessness | Light's Potential; health potion = Concentrated Silvermoon Health Potion; oil = Thalassian Phoenix Oil; rune = Void-Touched Augment Rune
+devastation evoker: flask = Flask of the Shattered Sun; food = Harandar Celebration | Silvermoon Parade; potion = Potion of Recklessness; health potion = Concentrated Silvermoon Health Potion; oil = Thalassian Phoenix Oil; rune = Void-Touched Augment Rune
+preservation evoker: flask = Flask of the Magisters; food = Hearty Royal Roast | Hearty Silvermoon Parade; health potion = Concentrated Silvermoon Health Potion; mana potion = Lightfused Mana Potion | Light's Potential; oil = Thalassian Phoenix Oil; rune = Void-Touched Augment Rune
 
 # Hunter
-# beast mastery hunter      : secondary = -   # https://www.method.gg/guides/beast-mastery-hunter/stats-races-and-consumables
-# marksmanship hunter       : secondary = -   # https://www.method.gg/guides/marksmanship-hunter/stats-races-and-consumables
-# survival hunter           : secondary = -   # https://www.method.gg/guides/survival-hunter/stats-races-and-consumables
+beast mastery hunter: flask = Flask of the Shattered Sun | Flask of the Magisters; food = Harandar Celebration | Silvermoon Parade | Hearty Royal Roast; potion = Potion of Recklessness | Light's Potential; health potion = Concentrated Silvermoon Health Potion; oil = Thalassian Phoenix Oil; rune = Void-Touched Augment Rune
+marksmanship hunter: flask = Flask of the Shattered Sun | Flask of the Magisters; food = Harandar Celebration | Silvermoon Parade | Hearty Royal Roast; potion = Potion of Recklessness | Light's Potential; health potion = Concentrated Silvermoon Health Potion; oil = Thalassian Phoenix Oil; rune = Void-Touched Augment Rune
+survival hunter: flask = Flask of the Magisters; food = Silvermoon Parade; potion = Draught of Rampant Abandon; health potion = Concentrated Silvermoon Health Potion; oil = Thalassian Phoenix Oil | Refulgent Weightstone; rune = Void-Touched Augment Rune
 
 # Mage
-# arcane mage               : secondary = -   # https://www.method.gg/guides/arcane-mage/stats-races-and-consumables
-# fire mage                 : secondary = -   # https://www.method.gg/guides/fire-mage/stats-races-and-consumables
-# frost mage                : secondary = -   # https://www.method.gg/guides/frost-mage/stats-races-and-consumables
+arcane mage: flask = Flask of the Magisters; food = Harandar Celebration; potion = Light's Potential; health potion = Silvermoon Health Potion; oil = Thalassian Phoenix Oil; rune = Void-Touched Augment Rune
+fire mage: flask = Flask of the Magisters | Flask of the Blood Knights; food = Harandar Celebration; potion = Light's Potential; health potion = Concentrated Silvermoon Health Potion; oil = Thalassian Phoenix Oil; rune = Void-Touched Augment Rune
+frost mage: flask = Flask of the Shattered Sun; food = Harandar Celebration; potion = Potion of Recklessness; health potion = Concentrated Silvermoon Health Potion; oil = Thalassian Phoenix Oil; rune = Void-Touched Augment Rune
 
 # Monk
-# brewmaster monk           : secondary = -   # https://www.method.gg/guides/brewmaster-monk/stats-races-and-consumables
-# mistweaver monk           : secondary = -   # https://www.method.gg/guides/mistweaver-monk/stats-races-and-consumables
-# windwalker monk           : secondary = -   # https://www.method.gg/guides/windwalker-monk/stats-races-and-consumables
+brewmaster monk: flask = Flask of Thalassian Resistance; food = Silvermoon Parade | Harandar Celebration; potion = Light's Potential; health potion = Silvermoon Health Potion; oil = Thalassian Phoenix Oil
+mistweaver monk: flask = Flask of the Blood Knights; food = Hearty Harandar Celebration | Hearty Silvermoon Parade; potion = Light's Potential; health potion = Concentrated Silvermoon Health Potion; mana potion = Lightfused Mana Potion; oil = Thalassian Phoenix Oil; rune = Void-Touched Augment Rune
+windwalker monk: flask = Flask of the Blood Knights | Flask of the Shattered Sun | Flask of the Magisters; food = Harandar Celebration | Silvermoon Parade; potion = Potion of Recklessness; health potion = Concentrated Silvermoon Health Potion; oil = Thalassian Phoenix Oil; rune = Void-Touched Augment Rune
 
 # Paladin
-# holy paladin              : secondary = -   # https://www.method.gg/guides/holy-paladin/stats-races-and-consumables
-# protection paladin        : secondary = -   # https://www.method.gg/guides/protection-paladin/stats-races-and-consumables
-# retribution paladin       : secondary = -   # https://www.method.gg/guides/retribution-paladin/stats-races-and-consumables
+holy paladin: flask = Flask of the Blood Knights | Flask of the Magisters; food = Hearty Silvermoon Parade; health potion = Concentrated Silvermoon Health Potion; mana potion = Lightfused Mana Potion; oil = Thalassian Phoenix Oil
+protection paladin: flask = Flask of the Blood Knights; food = Harandar Celebration | Silvermoon Parade; potion = Potion of Recklessness; health potion = Concentrated Silvermoon Health Potion; oil = Thalassian Phoenix Oil | Rite of Sanctification; rune = Void-Touched Augment Rune; note = Thalassian Phoenix Oil: Templar · Rite of Sanctification: Lightsmith
+retribution paladin: flask = Flask of the Magisters; food = Royal Roast; potion = Potion of Recklessness | Light's Potential; health potion = Silvermoon Health Potion; oil = Thalassian Phoenix Oil; rune = Void-Touched Augment Rune; note = Light's Potential: depending on highest secondary
 
 # Priest
-# discipline priest         : secondary = -   # https://www.method.gg/guides/discipline-priest/stats-races-and-consumables
-# holy priest               : secondary = -   # https://www.method.gg/guides/holy-priest/stats-races-and-consumables
-# shadow priest             : secondary = -   # https://www.method.gg/guides/shadow-priest/stats-races-and-consumables
+discipline priest: flask = Flask of the Blood Knights; food = Royal Roast; potion = Light's Potential; health potion = Concentrated Silvermoon Health Potion; mana potion = Lightfused Mana Potion | Potion of Devoured Dreams; oil = Thalassian Phoenix Oil; rune = Void-Touched Augment Rune; note = feasts
+holy priest: flask = Flask of the Shattered Sun | Flask of the Magisters; food = Royal Roast; potion = Light's Potential; health potion = Concentrated Silvermoon Health Potion; mana potion = Lightfused Mana Potion | Potion of Devoured Dreams; oil = Thalassian Phoenix Oil; rune = Void-Touched Augment Rune; note = feasts
+shadow priest: flask = Flask of the Blood Knights | Flask of the Magisters; food = Warped Wise Wings | Fel-Kissed Filet; potion = Potion of Recklessness; health potion = Concentrated Silvermoon Health Potion; oil = Thalassian Phoenix Oil; rune = Void-Touched Augment Rune; note = any feast
 
 # Rogue
-# assassination rogue       : secondary = -   # https://www.method.gg/guides/assassination-rogue/stats-races-and-consumables
-outlaw rogue                : secondary = crit|haste   # https://www.method.gg/guides/outlaw-rogue/stats-races-and-consumables
-# subtlety rogue            : secondary = -   # https://www.method.gg/guides/subtlety-rogue/stats-races-and-consumables
+assassination rogue: flask = Flask of the Blood Knights; potion = Light's Potential; health potion = Silvermoon Health Potion; oil = Thalassian Phoenix Oil; rune = Void-Touched Augment Rune; note = any primary-stat feast
+outlaw rogue: flask = Flask of the Shattered Sun | Flask of the Blood Knights; food = Harandar Celebration; potion = Light's Potential; health potion = Concentrated Silvermoon Health Potion; oil = Thalassian Phoenix Oil; rune = Void-Touched Augment Rune
+subtlety rogue: flask = Flask of the Shattered Sun | Flask of the Magisters; food = Blooming Feast | Crimson Calamari; potion = Light's Potential; health potion = Concentrated Silvermoon Health Potion; oil = Thalassian Phoenix Oil; rune = Void-Touched Augment Rune
 
 # Shaman
-# elemental shaman          : secondary = -   # https://www.method.gg/guides/elemental-shaman/stats-races-and-consumables
-# enhancement shaman        : secondary = -   # https://www.method.gg/guides/enhancement-shaman/stats-races-and-consumables
-# restoration shaman        : secondary = -   # https://www.method.gg/guides/restoration-shaman/stats-races-and-consumables
+elemental shaman: flask = Flask of the Magisters; food = Silvermoon Parade | Harandar Celebration; potion = Light's Potential; health potion = Concentrated Silvermoon Health Potion; oil = Thalassian Phoenix Oil; rune = Void-Touched Augment Rune; note = Thalassian Phoenix Oil: only without Flametongue Weapon talent
+enhancement shaman: flask = Flask of the Magisters; food = Royal Roast; potion = Potion of Recklessness; health potion = Silvermoon Health Potion; oil = none; rune = Void-Touched Augment Rune; note = no weapon oil — uses Windfury Weapon + Flametongue Weapon
+restoration shaman: flask = Flask of the Shattered Sun; food = Hearty Silvermoon Parade; potion = Light's Potential; health potion = Silvermoon Health Potion; oil = none; rune = Void-Touched Augment Rune; note = no weapon oil — Earthliving Weapon
 
 # Warlock
-# affliction warlock        : secondary = -   # https://www.method.gg/guides/affliction-warlock/stats-races-and-consumables
-# demonology warlock        : secondary = -   # https://www.method.gg/guides/demonology-warlock/stats-races-and-consumables
-# destruction warlock       : secondary = -   # https://www.method.gg/guides/destruction-warlock/stats-races-and-consumables
+affliction warlock: flask = Flask of the Shattered Sun; food = Royal Roast | Harandar Celebration; potion = Light's Potential; health potion = Concentrated Silvermoon Health Potion; oil = Thalassian Phoenix Oil; rune = Void-Touched Augment Rune
+demonology warlock: flask = Flask of the Shattered Sun; food = Spellfire Filet; potion = Potion of Recklessness; health potion = Silvermoon Health Potion; oil = Thalassian Phoenix Oil; rune = Void-Touched Augment Rune
+destruction warlock: flask = Flask of the Blood Knights | Flask of the Shattered Sun; food = Royal Roast | Harandar Celebration | Silvermoon Parade; potion = Light's Potential | Potion of Recklessness; health potion = Concentrated Silvermoon Health Potion; oil = Thalassian Phoenix Oil; rune = Void-Touched Augment Rune
 
 # Warrior
-# arms warrior              : secondary = -   # https://www.method.gg/guides/arms-warrior/stats-races-and-consumables
-# fury warrior              : secondary = -   # https://www.method.gg/guides/fury-warrior/stats-races-and-consumables
-# protection warrior        : secondary = -   # https://www.method.gg/guides/protection-warrior/stats-races-and-consumables
-
+arms warrior: flask = Flask of the Blood Knights; food = Quel'dorei Medley | Silvermoon Parade; potion = Potion of Recklessness; health potion = Concentrated Silvermoon Health Potion; oil = Thalassian Phoenix Oil
+fury warrior: flask = Flask of the Blood Knights; food = Quel'dorei Medley | Silvermoon Parade; potion = Light's Potential; health potion = Concentrated Silvermoon Health Potion; oil = Thalassian Phoenix Oil; note = Thalassian Phoenix Oil: on both weapons
+protection warrior: flask = Flask of Thalassian Resistance; food = Silvermoon Parade | Harandar Celebration; potion = Light's Potential; health potion = Silvermoon Health Potion; oil = Thalassian Phoenix Oil

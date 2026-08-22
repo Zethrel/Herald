@@ -5,7 +5,7 @@
 // "intellect casters use X" still answers for all nineteen intellect specs,
 // while a guild that disagrees about one spec can override just that one.
 
-import { ALL_KEY, NONE, SLOTS, isNone, resolveItemList } from './dataset.js';
+import { ALL_KEY, NONE, REQUIRED_SLOTS, SLOTS, isAnswered, isNone, resolveItemList } from './dataset.js';
 import { consensusFor, reportedSecondary } from '../sources/compare.js';
 
 /**
@@ -95,7 +95,7 @@ export function resolveSpecConsumables({ spec, dataset, overrides = {}, reports 
     source: guild.source ?? specEntry.source ?? null,
     note: guild.note ?? specEntry.note ?? null,
     updatedAt: guild.updatedAt ?? specEntry.updatedAt ?? dataset.updatedAt ?? null,
-    complete: SLOTS.every((slot) => slots[slot].item),
+    complete: REQUIRED_SLOTS.every((slot) => isAnswered(slots[slot])),
   };
 }
 
@@ -152,7 +152,7 @@ export function gaps({ specs, dataset, overrides = {}, reports = null }) {
   const missing = [];
   for (const spec of specs) {
     const resolved = resolveSpecConsumables({ spec, dataset, overrides, reports });
-    const empty = SLOTS.filter((slot) => !resolved.slots[slot].item);
+    const empty = REQUIRED_SLOTS.filter((slot) => !isAnswered(resolved.slots[slot]));
     if (empty.length > 0) missing.push({ spec, slots: empty });
   }
   return missing;

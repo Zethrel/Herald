@@ -4,17 +4,21 @@
 // through 117 slash commands is worse. So there is a line format instead:
 //
 //   intellect: flask = Flask of X; food = Feast of Y; potion = Potion of Z
-//   fire mage: potion = Potion of Something Else
+//   fire mage: potion = Potion of Something Else; note = only on the pull
 //
 // A stat or role on the left fills a default, covering every spec that maps to
 // it. A spec on the left is an exception, and only needs the slots that differ.
 // Five default lines plus a handful of exceptions is the whole tier.
 //
+// The slots are flask, food, potion, health potion, mana potion, oil and rune.
+// Two fields are not items: `secondary`, which is the stat that picks the
+// flask, and `note`, which is free text shown alongside the answer.
+//
 // Pure: text in, a patch and a list of complaints out. Nothing is written here,
 // and a file with one bad line still contributes every good one.
 
 import { ROLES, STATS, findSpec } from '../game/specs.js';
-import { ALL_KEY, NONE, SECONDARY_ALIASES, SECONDARY_STATS, SLOTS } from './dataset.js';
+import { ALL_KEY, NONE, SECONDARY_ALIASES, SECONDARY_STATS } from './dataset.js';
 import { slugify } from '../sync/tierSync.js';
 
 const DEFAULT_KEYS = new Set([
@@ -37,14 +41,36 @@ const SLOT_ALIASES = {
   pot: 'potion',
   potions: 'potion',
   'combat potion': 'potion',
+  'health potion': 'healthPotion',
+  health: 'healthPotion',
+  healthpotion: 'healthPotion',
+  'healing potion': 'healthPotion',
+  'mana potion': 'manaPotion',
+  mana: 'manaPotion',
+  manapotion: 'manaPotion',
   oil: 'oil',
   'weapon oil': 'oil',
   oils: 'oil',
+  rune: 'rune',
+  'augment rune': 'rune',
+  augment: 'rune',
 };
+
+// What to call each slot back at someone who mistyped one. The canonical keys
+// are camelCase because they are object keys; nobody should have to type that.
+const SLOT_INPUT_NAMES = ['flask', 'food', 'potion', 'health potion', 'mana potion', 'oil', 'rune'];
 
 // Not an item: which secondary stat a spec stacks, which is what picks its
 // flask. Written on a spec line as `secondary = crit`.
 const SECONDARY_FIELD = 'secondary';
+
+/**
+ * Also not an item: a free-text qualifier on the whole entry, shown alongside
+ * it. This is where "only without the Flametongue Weapon talent" and "two oils,
+ * one per weapon" go -- a guide's conditions are part of its advice, and the
+ * alternative to recording them is dropping them.
+ */
+const NOTE_FIELD = 'note';
 
 /** "A | B" or "A / B": equally acceptable choices, primary first. */
 function splitAlternatives(value) {
@@ -72,6 +98,12 @@ function parseAssignments(text, lineNumber, errors) {
 
     const field = match[1].trim().toLowerCase();
     const value0 = match[2].trim();
+
+    if (field === NOTE_FIELD) {
+      if (!value0 || value0 === '-') continue;
+      assignments[NOTE_FIELD] = value0;
+      continue;
+    }
 
     if (field === SECONDARY_FIELD) {
       if (!value0 || value0 === '-') continue;
@@ -108,7 +140,7 @@ function parseAssignments(text, lineNumber, errors) {
       errors.push({
         line: lineNumber,
         text: trimmed,
-        reason: `unknown slot "${field}" — use ${SLOTS.join(', ')}, or \`secondary\``,
+        reason: `unknown slot "${field}" — use ${SLOT_INPUT_NAMES.join(', ')}, or \`secondary\` / \`note\``,
       });
       continue;
     }
@@ -154,7 +186,7 @@ export function parseTierText(text) {
       // A stat name, not an item: it selects a default block rather than
       // naming something anyone puts in their bags. `none` is not an item
       // either -- it is the statement that there is not one.
-      if (slot === SECONDARY_FIELD || name === NONE) {
+      if (slot === SECONDARY_FIELD || slot === NOTE_FIELD || name === NONE) {
         entry[slot] = name;
       } else if (Array.isArray(name)) {
         entry[slot] = name.map(remember);

@@ -23,6 +23,13 @@ export const SPECS = [
   spec('Death Knight', 'Frost', ROLES.melee, STATS.strength, ['frost dk', 'fdk']),
   spec('Death Knight', 'Unholy', ROLES.melee, STATS.strength, ['uh dk', 'uhdk']),
 
+  // Devourer came in with the guild's own consumable table rather than from
+  // this file's usual source, so its role is the one thing here that is
+  // inferred: agility is certain (it is a Demon Hunter), Vengeance is already
+  // the tank, and the table gives it two weapon oils, which is a dual-wielding
+  // damage spec. Correct the role here if that turns out to be wrong -- nothing
+  // else in the code decides it.
+  spec('Demon Hunter', 'Devourer', ROLES.melee, STATS.agility, ['devourer dh', 'dev dh']),
   spec('Demon Hunter', 'Havoc', ROLES.melee, STATS.agility, ['havoc dh']),
   spec('Demon Hunter', 'Vengeance', ROLES.tank, STATS.agility, ['veng dh', 'vdh']),
 

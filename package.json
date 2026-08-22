@@ -14,6 +14,7 @@
     "sync-tier": "node --env-file-if-exists=.env scripts/sync-tier.js",
     "check-guides": "node scripts/check-guides.js",
     "import-tier": "node scripts/import-tier.js",
+    "import-table": "node scripts/import-table.js",
     "invite": "node --env-file-if-exists=.env scripts/invite.js"
   },
   "license": "UNLICENSED",

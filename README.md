@@ -271,8 +271,19 @@ recipe that yields 2 is 5 crafts, 15 of the first herb, and one flask spare.
 
 **The Quartermaster does not know what the current tier wants, and does not pretend to.**
 Everything above is driven by [`tiers/current.json`](tiers/current.json), which
-ships empty. An unfilled slot renders as *not set for this tier* — never as a
-plausible-looking guess, because a guessed reagent list costs real gold.
+holds what people have told it and nothing else. An unfilled slot renders as
+*not set for this tier* — never as a plausible-looking guess, because a guessed
+reagent list costs real gold.
+
+It currently ships filled in for all forty specs, from the guild's own table at
+[`tiers/sources/spec-consumables.md`](tiers/sources/spec-consumables.md). That
+is a starting point, not an authority: every line is meant to be edited when a
+spec's advice changes. See *Getting it in* below.
+
+Seven slots are recorded per spec — flask, food, combat potion, health potion,
+mana potion, weapon oil and augment rune. Only the first four are ever reported
+as missing: a melee spec has no mana potion and never will, so an unanswered
+optional slot is left out of the reply instead of being announced.
 
 The file has four parts:
 
@@ -282,7 +293,7 @@ The file has four parts:
 | `reports` | what Method says, per spec — see *What Method says* |
 | `recipes` | slug → profession, yield, reagents. This is what makes the shopping list possible |
 | `defaults` | per secondary (`crit`, `haste`, `mastery`, `versatility`), per role (`healer`, `tank`), per primary stat (`intellect`, `agility`, `strength`), and `all` |
-| `specs` | per spec, when a spec departs from its stat's default |
+| `specs` | per spec: its slots, an optional `secondary`, and a free-text `note` |
 
 Answers resolve most specific first: **this server's override → the spec's own
 entry → what Method says → its role → its primary stat.** So one
@@ -341,10 +352,13 @@ Every quoted line keeps Method's name, the page URL and when it was read. This
 is someone else's editorial judgement; the Quartermaster repeats it with attribution rather
 than absorbing it.
 
-### Getting it in: fill in the blanks
+### Getting it in
 
-[`tiers/current.txt`](tiers/current.txt) is a fill-in-the-blanks file. Open it,
-type the item names next to the labels, and run one command:
+There are two files, and which one you touch depends on how much you are
+changing.
+
+**One spec changed its advice.** Edit its line in
+[`tiers/current.txt`](tiers/current.txt) and load the file:
 
 ```sh
 npm run import-tier -- tiers/current.txt --dry   # show what it read
@@ -352,39 +366,77 @@ npm run import-tier -- tiers/current.txt         # write it
 npm run sync-tier                                # item ids, yields, reagents
 ```
 
-The top of the file is already filled in with the current tier's shared items:
+A line is a spec, then the slots, separated by semicolons so item names may
+contain commas:
 
 ```
-all: food = Harandar Celebration
-all: potion = Light's Potential
-
-crit:         flask = Flask of the Shattered Sun; oil = Thalassian Phoenix Oil
-haste:        flask = Flask of the Blood Knights; oil = Thalassian Phoenix Oil
-mastery:      flask = Flask of the Magisters;      oil = none
-versatility:  flask = Flask of Thalassian Resistance; oil = none
+protection paladin: flask = Flask of the Blood Knights; food = Harandar Celebration | Silvermoon Parade;
+                    potion = Potion of Recklessness; health potion = Concentrated Silvermoon Health Potion;
+                    oil = Thalassian Phoenix Oil | Rite of Sanctification; rune = Void-Touched Augment Rune;
+                    note = Thalassian Phoenix Oil: Templar · Rite of Sanctification: Lightsmith
 ```
 
-Thalassian Phoenix Oil covers crit and haste, and no mastery or versatility oil
-exists — `none` says exactly that. It is a different answer from a blank: a spec
-is told *none this tier* rather than being shown an empty slot it has to go and
-check.
+`A | B` means both are acceptable, first one primary: `/consumables spec`
+renders them as *"X or Y"*, and the shopping list buys only the first, since
+buying both would double the order. `none` is a real answer — Enhancement
+Shaman is told there is *no weapon oil this tier* rather than shown a blank it
+has to go and check. `note` is free text and rides along with the answer, which
+is where a guide's conditions live: *only without the Flametongue Weapon
+talent*, *Templar takes the oil, Lightsmith the rite*.
 
-Below that is every spec, commented out, each with a link to its Method page.
-Uncomment the ones you raid with and give each its stat priority — that one word
-is what selects its flask and oil:
+Import is additive, so a one-line correction is a one-line file — you never have
+to resend the whole thing.
+
+**A whole new table.** The per-spec half of `current.txt` is generated from
+[`tiers/sources/spec-consumables.md`](tiers/sources/spec-consumables.md), a
+markdown heading per class and a two-column table of spec and consumables — the
+shape a guide, a wiki or a guild chat message actually comes in. Replace it and
+regenerate:
+
+```sh
+npm run import-table -- tiers/sources/spec-consumables.md \
+  --prelude tiers/defaults.txt --out tiers/current.txt
+```
+
+[`tiers/defaults.txt`](tiers/defaults.txt) is the hand-written half that goes on
+top: the blocks that apply to more than one spec, which nothing generates.
+
+The converter works out which slot each item belongs in from its name, and its
+one rule is that it does not guess. A fragment it cannot place is printed and
+the run exits non-zero rather than filing it somewhere plausible, because a
+flask recorded as a potion is wrong on a raid night while one that never made it
+in is a blank someone fills. Two smaller calls it makes and reports:
 
 ```
-fire mage:          secondary = mastery
-outlaw rogue:       secondary = crit|haste
-protection warrior: secondary = versatility; potion = Potion of Recklessness
+40 of 40 row(s) converted.
+
+4 thing(s) worth a look:
+  Restoration Druid: "Lightfused Mana Potion / Light's Potential" mixes slots — filed under mana potion
 ```
 
-A spec that can run either stat takes both, and is offered both flasks — `A | B`
-works in any slot for the same reason. Alternatives are equally acceptable, not
-a fallback, so `/consumables spec` renders them as *"X or Y"*; the shopping list
-buys only the first, since buying both would double the order.
+Alternatives listed in one field that are not the same kind of thing get filed
+under the first, because that is the order the source wrote them in. And a
+shorthand — `Flask of the Magisters / Blood Knights` — is expanded only from a
+full name the same document spells out somewhere else. If nothing spells it out,
+it stays as written rather than becoming a guess at which flask was meant.
 
-Add item slots only where a spec departs from the blocks above.
+Regenerating overwrites `current.txt`, so a change worth keeping belongs in the
+table or in `defaults.txt`.
+
+**Flasks and the stat priority.** Every spec in the shipped table names its own
+flask, so nothing depends on the fallback. It is still there for a spec nobody
+has written a line for: modern flasks give a secondary stat rather than a
+primary one, so `defaults.txt` maps each stat to its flask and a spec only needs
+to say which stat it stacks.
+
+```
+crit:         flask = Flask of the Shattered Sun;     oil = Thalassian Phoenix Oil
+mastery:      flask = Flask of the Magisters;         oil = none
+
+outlaw rogue: secondary = crit|haste
+```
+
+A spec that can run either stat takes both and is offered both flasks.
 
 ### You do not edit this per raid
 
@@ -393,9 +445,10 @@ table, not a roster.** It answers "what does a Fire Mage bring", and signups
 answer "who is coming" — `/consumables shopping raid:<raid>` reads the actual
 roster, so nothing here is commented or uncommented per raid night.
 
-What does change is a spec's stat priority, and that moves with a patch or a
-build rather than with a raid. When someone signs up as a spec nobody has
-recorded one for, the shopping list says so by name and gives the command:
+What does change is a spec's advice, and that moves with a patch or a build
+rather than with a raid. When someone signs up as a spec whose flask nothing
+answers for — no line of its own and no stat priority to fall back on — the
+shopping list says so by name and gives the command:
 
 ```
 ⚠️ No stat priority recorded (2)
@@ -411,11 +464,11 @@ version-controlled baseline; runtime corrections live alongside it and win.
 The Quartermaster will not fill a stat priority in on its own. It cannot: which secondary a
 spec stacks is a judgement about that spec's build, and inventing one is exactly
 the guess this whole file refuses to make. What it does instead is notice the
-moment a raid needs one and hand you the one-line fix. Item names may
-contain commas — assignments are separated by semicolons for exactly that
-reason — a `-` or a blank means "not filled in yet" and is skipped, and `#`
-starts a comment. A line it cannot read is reported with its line number and
-skipped; every other line still lands.
+moment a raid needs one and hand you the one-line fix.
+
+A `-` or a blank in the text file means "not filled in yet" and is skipped, `#`
+starts a comment, and a line it cannot read is reported with its line number and
+skipped — every other line still lands.
 
 Add `--source method` to record the spec lines as *what Method says* rather than
 as the guild's own data. It attaches each spec's guide URL and the date, so
@@ -446,6 +499,11 @@ The confirmed list is explicit rather than "the pattern is verified", so a spec
 added by a future patch is *unverified* until someone checks it. A test fails in
 that case and names the fix, instead of the bot quietly linking somewhere that
 may not exist.
+
+Devourer Demon Hunter is in exactly that state right now: it arrived with the
+guild's consumable table rather than from a checked URL, so its Method link is
+derived and marked *unverified* in `/consumables compare` until someone runs
+`npm run check-guides` and moves the slug across.
 
 **There is still no scraper, deliberately.** Reading the recommendation off the
 page needs HTML selectors, and those can only be written against real markup and

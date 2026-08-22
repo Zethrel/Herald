@@ -1,0 +1,66 @@
+# Quartermaster tier data.
+#
+# This half is hand-written: the blocks that apply to more than one spec. The
+# per-spec lines below it are generated from tiers/sources/spec-consumables.md:
+#
+#   npm run import-table -- tiers/sources/spec-consumables.md \
+#     --prelude tiers/defaults.txt --out tiers/current.txt
+#
+# Then load it into the bot:
+#
+#   npm run import-tier -- tiers/current.txt --dry   (check it read you right)
+#   npm run import-tier -- tiers/current.txt
+#   npm run sync-tier                                (item ids, yields, reagents)
+#
+# Editing tiers/current.txt directly is fine too, and is the quicker way to fix
+# one spec. Regenerating overwrites it, so a change worth keeping belongs either
+# here or in the source table.
+#
+# Format:   key: slot = item name; slot = item name
+# Slots:    flask, food, potion, health potion, mana potion, oil, rune
+# Also:     secondary = crit|haste|mastery|versatility   (which stat picks the flask)
+#           note = free text                             (shown with the answer)
+# Alternatives are separated by | and the first one is the primary.
+# Separator is a semicolon, so item names may contain commas.
+# A dash or a blank value means "not filled in yet" and is skipped.
+# `none` means there is no such consumable this tier, which is a real answer.
+# Anything after # is a comment.
+
+
+# ---- Everyone --------------------------------------------------------------
+#
+# The lowest-priority block: applies to every spec, whatever it plays. It is
+# what answers for a spec whose own line leaves a slot out — an "any feast"
+# recommendation, for instance, names no item anyone can buy.
+
+all: food = Harandar Celebration
+all: potion = Light's Potential
+
+# Not set here on purpose: the source table lists an augment rune for most
+# specs but not all, and filling the gaps in would be inventing agreement that
+# is not there. A guild that wants it for everyone can add one line:
+#
+#   all: rune = Void-Touched Augment Rune
+
+
+# ---- Flasks, by secondary stat ----------------------------------------------
+#
+# Modern flasks give a secondary stat, not a primary one, so the flask follows
+# the stat priority rather than the class. Every spec below names its own flask
+# outright, so this block is the fallback for a spec that does not — give such a
+# spec a "secondary = ..." line and its flask follows from here.
+
+crit:         flask = Flask of the Shattered Sun;     oil = Thalassian Phoenix Oil
+haste:        flask = Flask of the Blood Knights;     oil = Thalassian Phoenix Oil
+mastery:      flask = Flask of the Magisters;         oil = none
+versatility:  flask = Flask of Thalassian Resistance; oil = none
+
+# Thalassian Phoenix Oil covers crit and haste, and no mastery or versatility
+# oil exists yet. "none" says exactly that: those specs are told there is no oil
+# this tier, rather than being shown a blank they have to go and check.
+
+
+# ---- Per spec ---------------------------------------------------------------
+#
+# Generated from the guild's own table. Edit a line to change what a spec is
+# told to bring; the format is the same as everything above.
