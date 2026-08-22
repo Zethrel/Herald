@@ -3,9 +3,30 @@ import { Events, MessageFlags } from 'discord.js';
 import { BOT_NAME } from '../branding.js';
 import { commandsByName } from '../commands/index.js';
 import { currentApproved } from '../access/guard.js';
+import { syncBoard } from '../consumables/board.js';
 import { handleRaidComponent, isRaidComponent } from './raidComponents.js';
 
 export const name = Events.InteractionCreate;
+
+// Commands that can change what the consumables board says: the consumable data
+// itself, and the raid rosters that decide which specs are marked. Anything
+// else -- /about, /welcome, /guilds -- cannot, and re-rendering after them
+// would spend an API call to discover nothing changed.
+const BOARD_TOUCHING = new Set(['consumables', 'raid']);
+
+/**
+ * Bring the board back in line after something changed. Deliberately not
+ * awaited: the board is a convenience, and it must never be the reason a
+ * command appears to fail. `syncBoard` returns early when this server has no
+ * board, and when the render is identical to what is already posted.
+ */
+function refreshBoard(interaction, context) {
+  if (!interaction.guildId) return;
+
+  syncBoard(interaction.guildId, context).catch((error) =>
+    context.log.warn(`Consumables board refresh failed: ${error.message}`),
+  );
+}
 
 export async function execute(interaction, context) {
   // Type-ahead. Discord gives three seconds and ignores a late reply, so this
@@ -21,7 +42,9 @@ export async function execute(interaction, context) {
   if (isRaidComponent(interaction)) {
     if (!(await inApprovedServer(interaction, context))) return;
     try {
-      return await handleRaidComponent(interaction, context);
+      const handled = await handleRaidComponent(interaction, context);
+      refreshBoard(interaction, context);
+      return handled;
     } catch (error) {
       context.log.error(`Raid component failed: ${error.stack ?? error.message}`);
       const message = { content: `That did not work: ${error.message}`, flags: MessageFlags.Ephemeral };
@@ -44,6 +67,7 @@ export async function execute(interaction, context) {
 
   try {
     await command.execute(interaction, context);
+    if (BOARD_TOUCHING.has(interaction.commandName)) refreshBoard(interaction, context);
   } catch (error) {
     context.log.error(`/${interaction.commandName} failed: ${error.stack ?? error.message}`);
 

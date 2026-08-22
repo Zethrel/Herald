@@ -1,4 +1,5 @@
 import {
+  ChannelType,
   EmbedBuilder,
   InteractionContextType,
   MessageFlags,
@@ -25,6 +26,7 @@ import { rosterForShopping } from '../raids/model.js';
 import { SOURCES, sourceName } from '../sources/registry.js';
 import { compareSpec, disagreements, mergeReports } from '../sources/compare.js';
 import { guideUrl, isConfirmed } from '../sources/urls.js';
+import { boardHash, renderBoard, syncBoard } from '../consumables/board.js';
 
 export const data = new SlashCommandBuilder()
   .setName('consumables')
@@ -152,6 +154,27 @@ export const data = new SlashCommandBuilder()
       .addStringOption((option) =>
         option.setName('spec').setDescription('Which spec').setRequired(true).setAutocomplete(true),
       ),
+  )
+  .addSubcommandGroup((group) =>
+    group
+      .setName('board')
+      .setDescription('A standing list the bot keeps up to date (Manage Server)')
+      .addSubcommand((sub) =>
+        sub
+          .setName('post')
+          .setDescription('Post the board in a channel and keep it current')
+          .addChannelOption((option) =>
+            option
+              .setName('channel')
+              .setDescription('Where it goes')
+              .addChannelTypes(ChannelType.GuildText)
+              .setRequired(true),
+          ),
+      )
+      .addSubcommand((sub) => sub.setName('refresh').setDescription('Re-render it now'))
+      .addSubcommand((sub) =>
+        sub.setName('remove').setDescription('Stop updating it — the message itself stays'),
+      ),
   );
 
 /** Type-ahead over the spec catalogue, or over this server's raids. */
@@ -182,8 +205,23 @@ export async function autocomplete(interaction, { store }) {
   );
 }
 
-export async function execute(interaction, { store, dataset, prices, log }) {
+export async function execute(interaction, context) {
+  const { store, dataset, prices, log } = context;
   const sub = interaction.options.getSubcommand();
+
+  // The board is a different kind of thing from the rest of /consumables: it
+  // writes a message rather than answering one, so it is gated and handled
+  // before any of the spec plumbing below.
+  if (interaction.options.getSubcommandGroup(false) === 'board') {
+    if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
+      return interaction.reply({
+        content: 'Posting and updating the board is a Manage Server job.',
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+    return handleBoard(interaction, context, sub);
+  }
+
   const config = await store.get(interaction.guildId);
   const overrides = config.consumables?.overrides ?? {};
   const reports = mergeReports(dataset.reports, config.consumables?.reports);
@@ -774,5 +812,77 @@ async function addPrices(embed, { list, dataset, prices }) {
       'Blizzard regenerates this hourly at 20 past, so it will not move before then.',
       ...caveats,
     ].join('\n'),
+  });
+}
+
+// What the bot must hold in the board's channel, and what to call each one when
+// it does not. Checked before posting rather than after: a board that failed to
+// send is easier to explain here than as a silent absence later.
+const BOARD_PERMISSIONS = [
+  [PermissionFlagsBits.ViewChannel, 'View Channel'],
+  [PermissionFlagsBits.SendMessages, 'Send Messages'],
+  [PermissionFlagsBits.EmbedLinks, 'Embed Links'],
+];
+
+async function handleBoard(interaction, context, sub) {
+  const { store, dataset, log } = context;
+
+  if (sub === 'remove') {
+    await store.update(interaction.guildId, {
+      consumables: { board: { channelId: null, messageId: null, hash: null } },
+    });
+
+    return interaction.reply({
+      content:
+        'Stopped updating the board. The message itself is still there — delete it yourself if you want it gone.',
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+
+  if (sub === 'refresh') {
+    const { status } = await syncBoard(interaction.guildId, context, { force: true });
+
+    const said = {
+      none: 'There is no board on this server yet. Post one with `/consumables board post`.',
+      gone: 'That board message is gone — somebody deleted it. Post a new one with `/consumables board post`.',
+      edited: 'Board updated.',
+      unchanged: 'Board updated.',
+      failed: 'I could not edit the board. Check I can still see and post in that channel.',
+    };
+
+    return interaction.reply({ content: said[status] ?? said.failed, flags: MessageFlags.Ephemeral });
+  }
+
+  const channel = interaction.options.getChannel('channel');
+  const missing = BOARD_PERMISSIONS.filter(
+    ([bit]) => !channel.permissionsFor(interaction.guild.members.me)?.has(bit),
+  );
+
+  if (missing.length > 0) {
+    return interaction.reply({
+      content: `I cannot post in ${channel}: I am missing ${missing.map(([, label]) => label).join(', ')} there.`,
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+
+  const { config, embed } = await renderBoard(interaction.guildId, { store, dataset });
+  const previous = config.consumables?.board;
+
+  const message = await channel.send({ embeds: [embed] });
+  await store.update(interaction.guildId, {
+    consumables: { board: { channelId: channel.id, messageId: message.id, hash: boardHash(embed) } },
+  });
+  log.info(`${interaction.user.tag} posted the consumables board in #${channel.name}`);
+
+  // Moving the board leaves the old message sitting there looking authoritative
+  // while nothing updates it, which is worse than no board at all.
+  const orphan =
+    previous?.messageId && previous.messageId !== message.id
+      ? ` The old one in <#${previous.channelId}> has stopped updating — delete it.`
+      : '';
+
+  return interaction.reply({
+    content: `Board posted: ${message.url}\nIt re-renders itself whenever the consumable data or an open raid's roster changes.${orphan}`,
+    flags: MessageFlags.Ephemeral,
   });
 }
