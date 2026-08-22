@@ -10,7 +10,7 @@ import {
   embedSize,
   SLOT_ICONS,
   openRaids,
-  rosterLine,
+  rosterBlock,
   rosterSpecs,
   slotText,
   spill,
@@ -142,29 +142,38 @@ describe('slotText', () => {
   });
 });
 
-describe('rosterLine', () => {
-  const row = (count) => ({
-    spec: specByKey('mage.fire'),
-    count,
-    resolved: resolveSpecConsumables({ spec: specByKey('mage.fire'), dataset: tier() }),
-    slots: BOARD_SLOTS,
+describe('rosterBlock', () => {
+  const block = (count) =>
+    rosterBlock({
+      spec: specByKey('mage.fire'),
+      count,
+      resolved: resolveSpecConsumables({ spec: specByKey('mage.fire'), dataset: tier() }),
+      slots: BOARD_SLOTS,
+    });
+
+  it('heads the block with the spec and gives each consumable its own line', () => {
+    const lines = block(1);
+
+    assert.match(lines[0], /\*\*Fire Mage\*\*/);
+    assert.equal(lines.length, 1 + BOARD_SLOTS.length);
+    for (const line of lines.slice(1)) assert.ok(!line.includes('·'), 'consumables should not share a line');
   });
 
   it('counts only when there is more than one', () => {
-    assert.ok(!rosterLine(row(1)).includes('×'));
-    assert.match(rosterLine(row(4)), /×4/);
+    assert.ok(!block(1)[0].includes('×'));
+    assert.match(block(4)[0], /×4/);
   });
 
   it('says so rather than going blank when nothing is recorded', () => {
-    assert.match(
-      rosterLine({
-        spec: specByKey('mage.fire'),
-        count: 1,
-        resolved: resolveSpecConsumables({ spec: specByKey('mage.fire'), dataset: { specs: {}, defaults: {} } }),
-        slots: BOARD_SLOTS,
-      }),
-      /nothing recorded/,
-    );
+    const lines = rosterBlock({
+      spec: specByKey('mage.fire'),
+      count: 1,
+      resolved: resolveSpecConsumables({ spec: specByKey('mage.fire'), dataset: { specs: {}, defaults: {} } }),
+      slots: BOARD_SLOTS,
+    });
+
+    assert.equal(lines.length, 2);
+    assert.match(lines[1], /nothing recorded/);
   });
 });
 
@@ -208,19 +217,30 @@ describe('commonSlots', () => {
 });
 
 describe('spill', () => {
-  it('splits a roster too long for one field instead of dropping people', () => {
-    const lines = Array.from({ length: 30 }, (_, index) => `line ${index} ${'x'.repeat(80)}`);
-    const fields = spill('Raid', lines);
+  const blocks = (count) =>
+    Array.from({ length: count }, (_, index) => [`head ${index}`, 'x'.repeat(120), 'y'.repeat(120)]);
+
+  it('splits across fields instead of dropping people', () => {
+    const fields = spill('Raid', blocks(20));
 
     assert.ok(fields.length > 1);
     for (const field of fields) assert.ok(field.value.length <= LIMITS.fieldValue);
 
-    const joined = fields.map((field) => field.value).join('\n').split('\n');
-    assert.deepEqual(joined, lines);
+    // Everybody who went in comes out, in order.
+    const heads = fields.flatMap((field) => field.value.split('\n')).filter((line) => line.startsWith('head '));
+    assert.deepEqual(heads, blocks(20).map((block) => block[0]));
+  });
+
+  it('never splits one spec across two fields', () => {
+    for (const field of spill('Raid', blocks(20))) {
+      const lines = field.value.split('\n').filter((line) => line.length > 0);
+      // Every field starts a spec rather than continuing one.
+      assert.ok(lines[0].startsWith('head '), `field starts mid-block: ${lines[0].slice(0, 30)}`);
+    }
   });
 
   it('names the first field for the raid and continues the rest', () => {
-    const fields = spill('Raid', Array.from({ length: 30 }, () => 'x'.repeat(100)));
+    const fields = spill('Raid', blocks(20));
 
     assert.equal(fields[0].name, 'Raid');
     for (const field of fields.slice(1)) assert.equal(field.name, '⤷');
@@ -328,15 +348,15 @@ describe('slot icons', () => {
     for (const slot of BOARD_SLOTS) assert.ok(SLOT_ICONS[slot], `no icon for ${slot}`);
   });
 
-  it('marks every item on a row, so a wrapped line is still readable', () => {
-    const line = rosterLine({
+  it('marks every consumable line', () => {
+    const lines = rosterBlock({
       spec: specByKey('mage.fire'),
       count: 1,
       resolved: resolveSpecConsumables({ spec: specByKey('mage.fire'), dataset: tier() }),
       slots: BOARD_SLOTS,
-    });
+    }).join('\n');
 
-    for (const slot of BOARD_SLOTS) assert.ok(line.includes(SLOT_ICONS[slot]), `${slot} is unmarked`);
+    for (const slot of BOARD_SLOTS) assert.ok(lines.includes(SLOT_ICONS[slot]), `${slot} is unmarked`);
   });
 
   it('does not reuse a role icon, which would make the two columns ambiguous', () => {

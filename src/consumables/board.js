@@ -102,18 +102,23 @@ export function slotText(entry, { alternatives = false } = {}) {
   return `${entry.item.name}${other}`;
 }
 
-/** One roster row: who is bringing what, and what they need for it. */
-export function rosterLine({ spec, count, resolved, slots, alternatives = false }) {
-  const parts = slots
-    .map((slot) => {
-      const text = slotText(resolved.slots[slot], { alternatives });
-      return text ? `${SLOT_ICONS[slot] ?? ''} ${text}`.trim() : null;
-    })
-    .filter(Boolean);
+/**
+ * One spec's block: who is bringing it, then a line per consumable. Costs four
+ * lines where one would do, and buys the thing a raid night actually wants --
+ * nothing wraps, and the eye can run straight down the flask column.
+ */
+export function rosterBlock({ spec, count, resolved, slots, alternatives = false }) {
   const many = count > 1 ? ` ×${count}` : '';
-  const body = parts.length > 0 ? parts.join(' · ') : '_nothing recorded_';
+  const lines = [`${ROLE_ICONS[spec.role] ?? '•'} **${spec.name} ${spec.className}**${many}`];
 
-  return `${ROLE_ICONS[spec.role] ?? '•'} **${spec.name} ${spec.className}**${many} — ${body}`;
+  for (const slot of slots) {
+    const text = slotText(resolved.slots[slot], { alternatives });
+    if (text) lines.push(`${SLOT_ICONS[slot] ?? '·'} ${text}`);
+  }
+
+  if (lines.length === 1) lines.push('_nothing recorded_');
+
+  return lines;
 }
 
 /**
@@ -150,25 +155,31 @@ export function commonSlots(resolvedList, { alternatives = false } = {}) {
  * Lines into fields, splitting a roster too long for one field across several
  * rather than dropping people off the end of it.
  */
-export function spill(name, lines, budget = LIMITS.fieldValue) {
+export function spill(name, blocks, budget = LIMITS.fieldValue) {
   const fields = [];
   let current = [];
   let length = 0;
 
   const label = () => (fields.length === 0 ? name : '\u2937').slice(0, LIMITS.fieldName);
+  const push = () => fields.push({ name: label(), value: current.join('\n\n').slice(0, budget) || '\u2014' });
 
-  for (const line of lines) {
-    if (current.length > 0 && length + line.length + 1 > budget) {
-      fields.push({ name: label(), value: current.join('\n') });
+  for (const block of blocks) {
+    const text = block.join('\n');
+
+    // A block is one spec and its consumables. Splitting one across two fields
+    // would put a flask under somebody else's name, so a block that does not
+    // fit starts the next field instead.
+    if (current.length > 0 && length + text.length + 2 > budget) {
+      push();
       current = [];
       length = 0;
     }
 
-    current.push(line);
-    length += line.length + 1;
+    current.push(text);
+    length += text.length + 2;
   }
 
-  fields.push({ name: label(), value: current.join('\n').slice(0, budget) || '\u2014' });
+  push();
 
   return fields;
 }
@@ -232,13 +243,14 @@ function assemble({ rosters, dataset, alternatives = false }) {
       ? `${discordTime(new Date(raid.startsAt), 'F')} · ${discordTime(new Date(raid.startsAt), 'R')}`
       : null;
 
-    const lines = [when, ...rows.map((row) => rosterLine({ ...row, slots: rowSlots, alternatives }))].filter(
-      Boolean,
-    );
+    const blocks = [
+      when ? [when] : null,
+      ...rows.map((row) => rosterBlock({ ...row, slots: rowSlots, alternatives })),
+    ].filter(Boolean);
 
-    if (rows.length === 0) lines.push('_Nobody signed up yet._');
+    if (rows.length === 0) blocks.push(['_Nobody signed up yet._']);
 
-    return { raid, fields: spill(raid.title ?? raid.id, lines) };
+    return { raid, fields: spill(raid.title ?? raid.id, blocks) };
   });
 
   const omitted = [];
