@@ -8,6 +8,7 @@ import {
   buildBoardEmbed,
   commonSlots,
   embedSize,
+  SLOT_ICONS,
   openRaids,
   rosterLine,
   rosterSpecs,
@@ -319,5 +320,44 @@ describe('boardHash', () => {
       boardHash(buildBoardEmbed(withRoster(['yes', 'mage.fire']))),
       boardHash(buildBoardEmbed(withRoster(['yes', 'mage.fire'], ['yes', 'mage.fire']))),
     );
+  });
+});
+
+describe('slot icons', () => {
+  it('has one for every slot the board shows', () => {
+    for (const slot of BOARD_SLOTS) assert.ok(SLOT_ICONS[slot], `no icon for ${slot}`);
+  });
+
+  it('marks every item on a row, so a wrapped line is still readable', () => {
+    const line = rosterLine({
+      spec: specByKey('mage.fire'),
+      count: 1,
+      resolved: resolveSpecConsumables({ spec: specByKey('mage.fire'), dataset: tier() }),
+      slots: BOARD_SLOTS,
+    });
+
+    for (const slot of BOARD_SLOTS) assert.ok(line.includes(SLOT_ICONS[slot]), `${slot} is unmarked`);
+  });
+
+  it('does not reuse a role icon, which would make the two columns ambiguous', () => {
+    const roles = ['\u{1F6E1}\uFE0F', '\u{1F49A}', '\u2694\uFE0F', '\u{1F3F9}'];
+
+    for (const slot of BOARD_SLOTS) assert.ok(!roles.includes(SLOT_ICONS[slot]), `${slot} clashes with a role`);
+  });
+
+  it('explains each icon it used in the legend', () => {
+    const json = buildBoardEmbed({
+      dataset: tier(),
+      config: { raids: { 'raid-1': raid({ signups: signups(['yes', 'mage.fire']) }) } },
+    }).toJSON();
+
+    const shown = `${json.description}\n${json.fields.map((field) => field.value).join('\n')}`;
+
+    for (const slot of BOARD_SLOTS) {
+      // Every icon that turns up in the body is named in the description.
+      if (shown.includes(SLOT_ICONS[slot])) {
+        assert.ok(json.description.includes(SLOT_ICONS[slot]), `${slot} is used but not in the legend`);
+      }
+    }
   });
 });

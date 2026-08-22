@@ -31,6 +31,19 @@ export const BOARD_SLOTS = ['flask', 'food', 'potion', 'oil'];
 // people differently from the signup sheet above it makes two lists nobody can
 // cross-reference.
 export const ROLE_ORDER = ['tank', 'healer', 'melee', 'ranged'];
+
+// One per slot, so a row survives being wrapped by a narrow client: the reader
+// can still see where each item starts. Deliberately nothing weapon-shaped --
+// the roles already own the swords and bows.
+export const SLOT_ICONS = {
+  flask: '\u{1F9EA}',
+  food: '\u{1F356}',
+  potion: '\u2697\uFE0F',
+  oil: '\u{1F6E2}\uFE0F',
+  healthPotion: '\u2764\uFE0F',
+  manaPotion: '\u{1F537}',
+  rune: '\u{1F4DC}',
+};
 export const ROLE_ICONS = { tank: '🛡️', healer: '💚', melee: '⚔️', ranged: '🏹' };
 
 // Discord's own ceilings. Exceeding any one rejects the whole message, so the
@@ -91,7 +104,12 @@ export function slotText(entry, { alternatives = false } = {}) {
 
 /** One roster row: who is bringing what, and what they need for it. */
 export function rosterLine({ spec, count, resolved, slots, alternatives = false }) {
-  const parts = slots.map((slot) => slotText(resolved.slots[slot], { alternatives })).filter(Boolean);
+  const parts = slots
+    .map((slot) => {
+      const text = slotText(resolved.slots[slot], { alternatives });
+      return text ? `${SLOT_ICONS[slot] ?? ''} ${text}`.trim() : null;
+    })
+    .filter(Boolean);
   const many = count > 1 ? ` ×${count}` : '';
   const body = parts.length > 0 ? parts.join(' · ') : '_nothing recorded_';
 
@@ -198,9 +216,8 @@ function assemble({ rosters, dataset, alternatives = false }) {
     [
       shared.length > 0 ? `**Everyone** — ${slotSummary(shared)}` : null,
       mostly.length > 0 ? `**Most specs** — ${slotSummary(mostly)}` : null,
-      rowSlots.length > 0
-        ? `_Then per spec: ${rowSlots.map((slot) => SLOT_LABELS[slot]).join(' · ')}. ×N is how many are bringing it._`
-        : '_Everybody needs the same things this tier._',
+      // Every icon that appears anywhere above or below, named once.
+      `_${legend(BOARD_SLOTS.filter((slot) => slot in common || rowSlots.includes(slot)))} · ×N how many are bringing it_`,
     ]
       .filter(Boolean)
       .join('\n'),
@@ -258,7 +275,12 @@ function assemble({ rosters, dataset, alternatives = false }) {
 }
 
 function slotSummary(entries) {
-  return entries.map(([slot, entry]) => `${SLOT_LABELS[slot]}: ${entry.text}`).join(' · ');
+  return entries.map(([slot, entry]) => `${SLOT_ICONS[slot] ?? ''} ${entry.text}`.trim()).join(' · ');
+}
+
+/** What the icons mean, for whoever has not seen the board before. */
+function legend(slots) {
+  return slots.map((slot) => `${SLOT_ICONS[slot] ?? ''} ${SLOT_LABELS[slot].toLowerCase()}`.trim()).join(' · ');
 }
 
 /** Total characters Discord counts against the 6000 ceiling. */
