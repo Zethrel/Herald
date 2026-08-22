@@ -4,28 +4,28 @@ import { describe, it } from 'node:test';
 import {
   BOARD_SLOTS,
   LIMITS,
-  SIGNED_MARK,
   boardHash,
   buildBoardEmbed,
   commonSlots,
   embedSize,
-  fit,
-  signedUpSpecKeys,
+  openRaids,
+  rosterLine,
+  rosterSpecs,
   slotText,
-  specLine,
+  spill,
 } from '../src/consumables/board.js';
-import { SPECS, specByKey } from '../src/game/specs.js';
 import { resolveSpecConsumables } from '../src/consumables/resolve.js';
+import { SPECS, specByKey } from '../src/game/specs.js';
 
-// A tier small enough to reason about: one flask that differs by stat, and an
-// oil every spec shares, which is the case the board hoists out of the table.
-function tier() {
+const HOUR = 3_600_000;
+
+// A tier small enough to reason about: one answer for everybody, so anything
+// the board does differently per spec is the board's doing and not the data's.
+function tier(specs = {}) {
   return {
     tier: { name: 'Test Tier' },
-    specs: {},
-    defaults: {
-      all: { flask: 'Test Flask', food: 'Test Food', potion: 'Test Potion', oil: 'Test Oil' },
-    },
+    specs,
+    defaults: { all: { flask: 'Test Flask', food: 'Test Food', potion: 'Test Potion', oil: 'Test Oil' } },
     items: {},
     recipes: {},
     reports: {},
@@ -35,7 +35,8 @@ function tier() {
 function raid(overrides = {}) {
   return {
     id: 'raid-1',
-    startsAt: new Date(Date.now() + 86_400_000).toISOString(),
+    title: 'Test Raid',
+    startsAt: new Date(Date.now() + 24 * HOUR).toISOString(),
     closed: false,
     cancelled: false,
     signups: {},
@@ -43,51 +44,85 @@ function raid(overrides = {}) {
   };
 }
 
-describe('signedUpSpecKeys', () => {
-  it('collects the specs on the roster', () => {
+function signups(...pairs) {
+  return Object.fromEntries(
+    pairs.map(([status, specKey], index) => [`user-${index}`, { status, specKey }]),
+  );
+}
+
+describe('openRaids', () => {
+  it('drops closed, cancelled and finished raids', () => {
     const config = {
       raids: {
-        'raid-1': raid({
-          signups: {
-            u1: { status: 'yes', specKey: 'mage.fire' },
-            u2: { status: 'late', specKey: 'druid.restoration' },
-          },
-        }),
+        a: raid({ id: 'a', closed: true }),
+        b: raid({ id: 'b', cancelled: true }),
+        c: raid({ id: 'c', startsAt: new Date(Date.now() - HOUR).toISOString() }),
+        d: raid({ id: 'd' }),
       },
     };
 
-    const keys = signedUpSpecKeys(config);
-    assert.ok(keys.has('mage.fire'));
-    // Late still turns up, and still needs a flask.
-    assert.ok(keys.has('druid.restoration'));
+    assert.deepEqual(openRaids(config).map((entry) => entry.id), ['d']);
   });
 
-  it('marks exactly who the shopping list buys for, and nobody else', () => {
-    // The board and `/consumables shopping` must not disagree about who is
-    // coming: both follow ROSTER_STATUSES.
-    for (const status of ['tentative', 'bench', 'no']) {
-      const config = {
-        raids: { 'raid-1': raid({ signups: { u1: { status, specKey: 'mage.fire' } } }) },
-      };
-      assert.equal(signedUpSpecKeys(config).size, 0, `${status} should not be marked`);
-    }
+  it('lists the soonest first', () => {
+    const config = {
+      raids: {
+        later: raid({ id: 'later', startsAt: new Date(Date.now() + 72 * HOUR).toISOString() }),
+        sooner: raid({ id: 'sooner', startsAt: new Date(Date.now() + 2 * HOUR).toISOString() }),
+      },
+    };
+
+    assert.deepEqual(openRaids(config).map((entry) => entry.id), ['sooner', 'later']);
   });
 
-  it('ignores closed, cancelled and finished raids', () => {
-    const signups = { u1: { status: 'yes', specKey: 'mage.fire' } };
+  it('is empty rather than undefined for a server with no raids', () => {
+    assert.deepEqual(openRaids({}), []);
+    assert.deepEqual(openRaids(undefined), []);
+  });
+});
 
-    for (const gone of [
-      raid({ signups, closed: true }),
-      raid({ signups, cancelled: true }),
-      raid({ signups, startsAt: new Date(Date.now() - 3_600_000).toISOString() }),
-    ]) {
-      assert.equal(signedUpSpecKeys({ raids: { 'raid-1': gone } }).size, 0);
-    }
+describe('rosterSpecs', () => {
+  it('counts people rather than repeating the spec', () => {
+    const rows = rosterSpecs(raid({ signups: signups(['yes', 'mage.fire'], ['yes', 'mage.fire']) }));
+
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].count, 2);
+    assert.equal(rows[0].spec.key, 'mage.fire');
   });
 
-  it('is empty for a server with no raids', () => {
-    assert.equal(signedUpSpecKeys({}).size, 0);
-    assert.equal(signedUpSpecKeys(undefined).size, 0);
+  it('takes exactly the statuses the shopping list buys for', () => {
+    const rows = rosterSpecs(
+      raid({
+        signups: signups(
+          ['yes', 'mage.fire'],
+          ['late', 'priest.holy'],
+          ['tentative', 'druid.balance'],
+          ['bench', 'rogue.subtlety'],
+          ['no', 'warrior.arms'],
+        ),
+      }),
+    );
+
+    assert.deepEqual(rows.map((row) => row.spec.key).sort(), ['mage.fire', 'priest.holy']);
+  });
+
+  it('orders tanks, then healers, then melee, then ranged', () => {
+    const rows = rosterSpecs(
+      raid({
+        signups: signups(
+          ['yes', 'mage.fire'],
+          ['yes', 'warrior.protection'],
+          ['yes', 'rogue.subtlety'],
+          ['yes', 'priest.holy'],
+        ),
+      }),
+    );
+
+    assert.deepEqual(rows.map((row) => row.spec.role), ['tank', 'healer', 'melee', 'ranged']);
+  });
+
+  it('ignores a signup with no spec picked', () => {
+    assert.deepEqual(rosterSpecs(raid({ signups: signups(['yes', null]) })), []);
   });
 });
 
@@ -98,116 +133,191 @@ describe('slotText', () => {
     assert.equal(slotText({ none: true, item: null, alternatives: [] }), null);
   });
 
-  it('offers the alternative, and drops it when asked to be compact', () => {
+  it('leaves the alternative out unless asked for it', () => {
     const entry = { item: { name: 'A' }, alternatives: [{ name: 'B' }] };
-    assert.equal(slotText(entry), 'A / B');
-    assert.equal(slotText(entry, { alternatives: false }), 'A');
+
+    assert.equal(slotText(entry), 'A');
+    assert.equal(slotText(entry, { alternatives: true }), 'A / B');
   });
 });
 
-describe('specLine', () => {
-  const resolved = () => resolveSpecConsumables({ spec: specByKey('mage.fire'), dataset: tier() });
+describe('rosterLine', () => {
+  const row = (count) => ({
+    spec: specByKey('mage.fire'),
+    count,
+    resolved: resolveSpecConsumables({ spec: specByKey('mage.fire'), dataset: tier() }),
+    slots: BOARD_SLOTS,
+  });
 
-  it('marks a spec somebody signed up as', () => {
-    assert.ok(specLine({ resolved: resolved(), signed: true }).startsWith(SIGNED_MARK));
-    assert.ok(!specLine({ resolved: resolved(), signed: false }).startsWith(SIGNED_MARK));
+  it('counts only when there is more than one', () => {
+    assert.ok(!rosterLine(row(1)).includes('×'));
+    assert.match(rosterLine(row(4)), /×4/);
   });
 
   it('says so rather than going blank when nothing is recorded', () => {
-    const empty = resolveSpecConsumables({ spec: specByKey('mage.fire'), dataset: { specs: {}, defaults: {} } });
-    assert.match(specLine({ resolved: empty }), /nothing recorded/);
+    assert.match(
+      rosterLine({
+        spec: specByKey('mage.fire'),
+        count: 1,
+        resolved: resolveSpecConsumables({ spec: specByKey('mage.fire'), dataset: { specs: {}, defaults: {} } }),
+        slots: BOARD_SLOTS,
+      }),
+      /nothing recorded/,
+    );
   });
 });
 
 describe('commonSlots', () => {
-  it('hoists a slot every spec answers the same way', () => {
-    const all = SPECS.map((spec) => resolveSpecConsumables({ spec, dataset: tier() }));
-    const common = commonSlots(all);
+  const resolvedFor = (keys, dataset) =>
+    keys.map((key) => resolveSpecConsumables({ spec: specByKey(key), dataset }));
 
-    for (const slot of BOARD_SLOTS) assert.equal(common[slot], `Test ${slotName(slot)}`);
+  it('hoists a slot everybody answers the same way, and says everybody', () => {
+    const common = commonSlots(resolvedFor(['mage.fire', 'priest.holy', 'warrior.arms'], tier()));
+
+    assert.equal(common.flask.text, 'Test Flask');
+    assert.equal(common.flask.all, true);
   });
 
-  it('leaves a slot alone when one spec differs', () => {
-    const dataset = tier();
-    dataset.specs = { 'mage.fire': { flask: 'Something Else' } };
-    const all = SPECS.map((spec) => resolveSpecConsumables({ spec, dataset }));
+  it('still hoists past a gap, but stops claiming everybody', () => {
+    const dataset = tier({ 'mage.fire': { oil: 'none' } });
+    const common = commonSlots(resolvedFor(['mage.fire', 'priest.holy', 'warrior.arms'], dataset));
 
-    assert.equal(commonSlots(all).flask, undefined);
+    assert.equal(common.oil.text, 'Test Oil');
+    assert.equal(common.oil.all, false);
+  });
+
+  it('leaves a slot on the rows when one spec disagrees', () => {
+    const dataset = tier({ 'mage.fire': { flask: 'Something Else' } });
+
+    assert.equal(commonSlots(resolvedFor(['mage.fire', 'priest.holy'], dataset)).flask, undefined);
+  });
+
+  it('leaves a slot on the rows when only a minority answers it', () => {
+    const dataset = tier({});
+    dataset.defaults = {};
+    dataset.specs = { 'mage.fire': { oil: 'Lonely Oil' } };
+    const common = commonSlots(resolvedFor(['mage.fire', 'priest.holy', 'warrior.arms', 'rogue.subtlety'], dataset));
+
+    assert.equal(common.oil, undefined);
+  });
+
+  it('is empty for an empty roster', () => {
+    assert.deepEqual(commonSlots([]), {});
   });
 });
 
-function slotName(slot) {
-  return { flask: 'Flask', food: 'Food', potion: 'Potion', oil: 'Oil' }[slot];
-}
+describe('spill', () => {
+  it('splits a roster too long for one field instead of dropping people', () => {
+    const lines = Array.from({ length: 30 }, (_, index) => `line ${index} ${'x'.repeat(80)}`);
+    const fields = spill('Raid', lines);
 
-describe('fit', () => {
-  it('keeps whole rows and says how many it dropped', () => {
-    const lines = Array.from({ length: 40 }, (_, index) => `row ${index} ${'x'.repeat(60)}`);
-    const value = fit(lines, 300);
+    assert.ok(fields.length > 1);
+    for (const field of fields) assert.ok(field.value.length <= LIMITS.fieldValue);
 
-    assert.ok(value.length <= 300);
-    // No half-written item names: every kept line is one of the originals.
-    for (const line of value.split('\n').slice(0, -1)) assert.ok(lines.includes(line));
-    assert.match(value, /more, see/);
+    const joined = fields.map((field) => field.value).join('\n').split('\n');
+    assert.deepEqual(joined, lines);
+  });
+
+  it('names the first field for the raid and continues the rest', () => {
+    const fields = spill('Raid', Array.from({ length: 30 }, () => 'x'.repeat(100)));
+
+    assert.equal(fields[0].name, 'Raid');
+    for (const field of fields.slice(1)) assert.equal(field.name, '⤷');
   });
 
   it('never returns an empty field value', () => {
-    assert.equal(fit([], 1024), '_nothing recorded_');
+    assert.equal(spill('Raid', [])[0].value, '—');
   });
 });
 
 describe('buildBoardEmbed', () => {
-  it('lists every spec, one field per class', () => {
-    const embed = buildBoardEmbed({ dataset: tier() });
-    const json = embed.toJSON();
+  const config = (...raids) => ({ raids: Object.fromEntries(raids.map((entry) => [entry.id, entry])) });
+
+  it('says nothing is on rather than listing every spec', () => {
+    const json = buildBoardEmbed({ dataset: tier(), config: {} }).toJSON();
+
+    assert.match(json.description, /Nothing is signed up/);
+    assert.equal(json.fields ?? undefined, undefined);
+  });
+
+  it('gives each open raid its own field', () => {
+    const json = buildBoardEmbed({
+      dataset: tier(),
+      config: config(
+        raid({ id: 'a', title: 'First', signups: signups(['yes', 'mage.fire']) }),
+        raid({
+          id: 'b',
+          title: 'Second',
+          startsAt: new Date(Date.now() + 48 * HOUR).toISOString(),
+          signups: signups(['yes', 'priest.holy']),
+        }),
+      ),
+    }).toJSON();
+
+    assert.deepEqual(json.fields.map((field) => field.name), ['First', 'Second']);
+  });
+
+  it('lists only the specs signed up', () => {
+    const json = buildBoardEmbed({
+      dataset: tier(),
+      config: config(raid({ signups: signups(['yes', 'mage.fire']) })),
+    }).toJSON();
+
     const text = json.fields.map((field) => field.value).join('\n');
-
-    assert.equal(json.fields.length, 13);
-    for (const spec of SPECS) assert.ok(text.includes(`**${spec.name}**`), `${spec.key} is missing`);
+    assert.match(text, /Fire Mage/);
+    assert.ok(!text.includes('Blood Death Knight'));
   });
 
-  it('stays inside every limit Discord enforces', () => {
-    const embed = buildBoardEmbed({ dataset: tier(), signedUp: new Set(SPECS.map((spec) => spec.key)) });
-    const json = embed.toJSON();
-
-    assert.ok(json.fields.length <= LIMITS.fields);
-    assert.ok(embedSize(embed) <= LIMITS.total);
-    for (const field of json.fields) assert.ok(field.value.length <= LIMITS.fieldValue);
-  });
-
-  it('stays inside the total even when every item name is absurd', () => {
-    const dataset = tier();
-    dataset.specs = Object.fromEntries(
-      SPECS.map((spec) => [spec.key, { flask: 'F'.repeat(90), food: 'D'.repeat(90), potion: 'P'.repeat(90) }]),
+  it('stays inside every limit Discord enforces, at three full raids', () => {
+    const everybody = signups(
+      ...SPECS.map((spec) => ['yes', spec.key]),
+      ...SPECS.map((spec) => ['yes', spec.key]),
     );
 
-    assert.ok(embedSize(buildBoardEmbed({ dataset })) <= LIMITS.total);
-  });
+    const embed = buildBoardEmbed({
+      dataset: tier(),
+      config: config(
+        // A title past Discord's field-name ceiling, on purpose.
+        raid({ id: 'a', title: 'A'.repeat(400), signups: everybody }),
+        raid({ id: 'b', title: 'B', startsAt: new Date(Date.now() + 48 * HOUR).toISOString(), signups: everybody }),
+        raid({ id: 'c', title: 'C', startsAt: new Date(Date.now() + 72 * HOUR).toISOString(), signups: everybody }),
+      ),
+    });
 
-  it('marks only the specs that are signed up', () => {
-    const embed = buildBoardEmbed({ dataset: tier(), signedUp: new Set(['mage.fire']) });
-    const text = embed.toJSON().fields.map((field) => field.value).join('\n');
-
-    assert.equal(text.split(SIGNED_MARK).length - 1, 1);
-    assert.match(text, new RegExp(`${SIGNED_MARK} \\*\\*Fire\\*\\*`));
+    const json = embed.toJSON();
+    assert.ok(json.fields.length <= LIMITS.fields, `${json.fields.length} fields`);
+    assert.ok(embedSize(embed) <= LIMITS.total, `${embedSize(embed)} characters`);
+    for (const field of json.fields) {
+      assert.ok(field.name.length <= LIMITS.fieldName);
+      assert.ok(field.value.length <= LIMITS.fieldValue);
+    }
   });
 });
 
 describe('boardHash', () => {
-  it('is stable for the same data and moves when the data does', () => {
-    const before = buildBoardEmbed({ dataset: tier() });
-    assert.equal(boardHash(before), boardHash(buildBoardEmbed({ dataset: tier() })));
-
-    const changed = tier();
-    changed.specs = { 'mage.fire': { flask: 'A Different Flask' } };
-    assert.notEqual(boardHash(before), boardHash(buildBoardEmbed({ dataset: changed })));
+  const withRoster = (...pairs) => ({
+    dataset: tier(),
+    config: { raids: { 'raid-1': raid({ signups: signups(...pairs) }) } },
   });
 
-  it('moves when only the signed-up markers change', () => {
-    const dataset = tier();
+  it('is stable for the same state', () => {
+    assert.equal(
+      boardHash(buildBoardEmbed(withRoster(['yes', 'mage.fire']))),
+      boardHash(buildBoardEmbed(withRoster(['yes', 'mage.fire']))),
+    );
+  });
+
+  it('moves when somebody joins', () => {
     assert.notEqual(
-      boardHash(buildBoardEmbed({ dataset })),
-      boardHash(buildBoardEmbed({ dataset, signedUp: new Set(['mage.fire']) })),
+      boardHash(buildBoardEmbed(withRoster(['yes', 'mage.fire']))),
+      boardHash(buildBoardEmbed(withRoster(['yes', 'mage.fire'], ['yes', 'priest.holy']))),
+    );
+  });
+
+  it('moves when a second person brings the same spec, because the count shows', () => {
+    assert.notEqual(
+      boardHash(buildBoardEmbed(withRoster(['yes', 'mage.fire']))),
+      boardHash(buildBoardEmbed(withRoster(['yes', 'mage.fire'], ['yes', 'mage.fire']))),
     );
   });
 });

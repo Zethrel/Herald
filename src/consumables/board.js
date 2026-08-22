@@ -1,10 +1,13 @@
 // The standing consumables board: one message the bot owns in a channel,
-// listing every spec's consumables and marking the ones signed up to an open
-// raid. It is edited in place, so the channel keeps one authoritative post
-// rather than a scroll of increasingly wrong ones.
+// saying what the people actually coming need to buy.
 //
-// The rendering half is pure -- specs and data in, an embed out -- so the
-// layout and Discord's size limits can be tested without a gateway. Only
+// It follows the roster, not the spec catalogue. All forty specs is a wall of
+// text nobody reads to the bottom of; the eight specs signed up for Tuesday is
+// a shopping list. Anyone wanting a spec that is not on it still has
+// `/consumables spec`.
+//
+// The rendering half is pure -- raids and tier data in, an embed out -- so the
+// layout and Discord's ceilings can be tested without a gateway. Only
 // `syncBoard` touches Discord.
 
 import { createHash } from 'node:crypto';
@@ -14,47 +17,69 @@ import { EmbedBuilder } from 'discord.js';
 import { BRAND_COLOR, FOOTER } from '../branding.js';
 import { ROSTER_STATUSES } from '../raids/model.js';
 import { SLOT_LABELS } from './dataset.js';
+import { discordTime } from '../raids/time.js';
 import { mergeReports } from '../sources/compare.js';
 import { resolveSpecConsumables } from './resolve.js';
-import { specsByClass } from '../game/specs.js';
+import { specByKey } from '../game/specs.js';
 
-// The four a raider actually has to buy. The optional slots (health and mana
-// potions, augment rune) stay on `/consumables spec`: on a 40-spec board they
-// are the difference between a table people read and one they scroll past.
+// The four a raider actually has to buy. The optional slots -- health and mana
+// potions, augment rune -- stay on `/consumables spec`: on a board they are the
+// difference between a list people read and one they scroll past.
 export const BOARD_SLOTS = ['flask', 'food', 'potion', 'oil'];
 
-/** Marks a spec somebody has signed up as. */
-export const SIGNED_MARK = '🔸';
+// Raid order, and the same icons the raid post uses. A board that sorts its
+// people differently from the signup sheet above it makes two lists nobody can
+// cross-reference.
+export const ROLE_ORDER = ['tank', 'healer', 'melee', 'ranged'];
+export const ROLE_ICONS = { tank: '🛡️', healer: '💚', melee: '⚔️', ranged: '🏹' };
 
-// Discord's own ceilings. Exceeding any one of them rejects the whole message,
-// so the renderer trims to fit rather than finding out at raid time.
-export const LIMITS = { fields: 25, fieldValue: 1024, total: 6000, title: 256 };
+// Discord's own ceilings. Exceeding any one rejects the whole message, so the
+// renderer trims to fit rather than finding out on a raid night.
+export const LIMITS = { fields: 25, fieldName: 256, fieldValue: 1024, total: 6000, title: 256 };
 
-/**
- * Spec keys somebody is signed up as, across every raid that is still open.
- * A closed or cancelled raid is history, and its roster should stop marking
- * the board.
- */
-export function signedUpSpecKeys(config, now = Date.now()) {
-  const keys = new Set();
+// Held back from the character budget for the "Not shown" note.
+const OMITTED_BUDGET = 260;
 
-  for (const raid of Object.values(config?.raids ?? {})) {
-    if (raid.closed || raid.cancelled) continue;
+/** Raids still taking signups, soonest first. */
+export function openRaids(config, now = Date.now()) {
+  return Object.values(config?.raids ?? {})
+    .filter((raid) => !raid.closed && !raid.cancelled)
     // A raid whose start time has passed is over in every sense that matters
     // here, whether or not anybody remembered to close it.
-    if (raid.startsAt && Date.parse(raid.startsAt) < now) continue;
+    .filter((raid) => !raid.startsAt || Date.parse(raid.startsAt) >= now)
+    .sort((a, b) => (Date.parse(a.startsAt ?? 0) || 0) - (Date.parse(b.startsAt ?? 0) || 0));
+}
 
-    for (const signup of Object.values(raid.signups ?? {})) {
-      if (!ROSTER_STATUSES.includes(signup.status)) continue;
-      if (signup.specKey) keys.add(signup.specKey);
-    }
+/**
+ * The specs on one raid's roster, one row each with how many people are
+ * bringing it. Four fire mages need four times the flasks and exactly one line.
+ */
+export function rosterSpecs(raid, lookup = specByKey) {
+  const counts = new Map();
+
+  for (const signup of Object.values(raid?.signups ?? {})) {
+    // The same statuses `/consumables shopping` buys for. The board and the
+    // shopping list disagreeing about who is coming would be worse than either
+    // being slightly conservative.
+    if (!ROSTER_STATUSES.includes(signup.status)) continue;
+    if (!signup.specKey) continue;
+
+    const spec = lookup(signup.specKey);
+    if (!spec) continue;
+
+    counts.set(spec.key, { spec, count: (counts.get(spec.key)?.count ?? 0) + 1 });
   }
 
-  return keys;
+  return [...counts.values()].sort(
+    (a, b) =>
+      ROLE_ORDER.indexOf(a.spec.role) - ROLE_ORDER.indexOf(b.spec.role) ||
+      a.spec.className.localeCompare(b.spec.className) ||
+      a.spec.name.localeCompare(b.spec.name),
+  );
 }
 
 /** What one slot says, or null when it says nothing worth a column. */
-export function slotText(entry, { alternatives = true } = {}) {
+export function slotText(entry, { alternatives = false } = {}) {
   // `none` is an answer -- "there is no oil this tier" -- and an empty slot is
   // a question. Neither belongs on a compact row, but only the second is worth
   // chasing, and `/consumables tier` is what lists those.
@@ -64,136 +89,182 @@ export function slotText(entry, { alternatives = true } = {}) {
   return `${entry.item.name}${other}`;
 }
 
-/** One spec's row: the name, then whatever is recorded for it. */
-export function specLine({ resolved, slots = BOARD_SLOTS, signed = false, alternatives = true }) {
+/** One roster row: who is bringing what, and what they need for it. */
+export function rosterLine({ spec, count, resolved, slots, alternatives = false }) {
   const parts = slots.map((slot) => slotText(resolved.slots[slot], { alternatives })).filter(Boolean);
-  const mark = signed ? `${SIGNED_MARK} ` : '';
-  const body = parts.length > 0 ? parts.join(' \u00b7 ') : '_nothing recorded_';
+  const many = count > 1 ? ` ×${count}` : '';
+  const body = parts.length > 0 ? parts.join(' · ') : '_nothing recorded_';
 
-  return `${mark}**${resolved.spec.name}** \u2014 ${body}`;
+  return `${ROLE_ICONS[spec.role] ?? '•'} **${spec.name} ${spec.className}**${many} — ${body}`;
 }
 
 /**
- * Slots every spec answers the same way. The weapon oil is one item for the
- * whole raid more often than not, and repeating it on forty rows spends a
- * thousand of the six thousand characters Discord allows to say nothing. Those
- * get hoisted into a single line above the table instead.
+ * Slots every spec on the board answers the same way. One weapon oil for the
+ * whole raid is the normal case, and repeating it on every row is the single
+ * biggest source of noise -- those get hoisted into one line above the rosters.
  */
-export function commonSlots(resolvedList, { alternatives = true } = {}) {
+export function commonSlots(resolvedList, { alternatives = false } = {}) {
   const common = {};
+  if (resolvedList.length === 0) return common;
 
   for (const slot of BOARD_SLOTS) {
-    const texts = new Set(resolvedList.map((resolved) => slotText(resolved.slots[slot], { alternatives })));
-    if (texts.size !== 1) continue;
+    const texts = resolvedList.map((resolved) => slotText(resolved.slots[slot], { alternatives }));
+    const answered = texts.filter(Boolean);
+    const distinct = new Set(answered);
 
-    const [only] = texts;
-    // All forty agreeing that a slot is empty is not worth a line either.
-    if (only) common[slot] = only;
+    // One answer between all of them, or it belongs on the rows.
+    if (distinct.size !== 1) continue;
+    // A blank or two is a gap in the tier file rather than a real difference,
+    // so it does not block the hoist -- but a slot only half the raid has an
+    // answer for is not a raid-wide statement, and stays on the rows.
+    if (answered.length < Math.max(2, Math.ceil(resolvedList.length / 2))) continue;
+
+    const [only] = distinct;
+    // Said out loud, because "everyone" when two specs have nothing recorded
+    // would be the board claiming more than the data does.
+    common[slot] = { text: only, all: answered.length === texts.length };
   }
 
   return common;
 }
 
 /**
- * The whole board: one field per class, one row per spec.
- *
- * @param {object} input
- * @param {object} input.dataset the tier file, as loaded at startup
- * @param {Record<string, object>} [input.overrides] this server's overrides
- * @param {object} [input.reports] merged guide reports
- * @param {Set<string>} [input.signedUp] spec keys signed up to an open raid
+ * Lines into fields, splitting a roster too long for one field across several
+ * rather than dropping people off the end of it.
  */
-export function buildBoardEmbed({ dataset, overrides = {}, reports = null, signedUp = new Set() }) {
-  const grouped = [...specsByClass()].map(([className, specs]) => [
-    className,
-    specs.map((spec) => resolveSpecConsumables({ spec, dataset, overrides, reports })),
-  ]);
-
-  // Built once at full detail. If that overruns Discord's ceiling the whole
-  // message is rejected, so the second attempt drops the "or this one"
-  // alternatives -- the first item is still correct, just less generous.
-  let embed = assemble({ grouped, signedUp, dataset, alternatives: true });
-  if (embedSize(embed) <= LIMITS.total) return embed;
-
-  // Second attempt drops the "or this one" alternatives. The first item is
-  // still correct, just less generous -- worth about a thousand characters.
-  embed = assemble({ grouped, signedUp, dataset, alternatives: false });
-
-  // Still over, which takes item names nobody has yet written. Squeeze the
-  // per-class budget until it fits: `fit` drops whole rows and says how many,
-  // so the board stays honest about what it is not showing.
-  for (let budget = LIMITS.fieldValue; embedSize(embed) > LIMITS.total && budget > 160; budget -= 120) {
-    embed = assemble({ grouped, signedUp, dataset, alternatives: false, fieldBudget: budget - 120 });
-  }
-
-  return embed;
-}
-
-function assemble({ grouped, signedUp, dataset, alternatives, fieldBudget = LIMITS.fieldValue }) {
-  const all = grouped.flatMap(([, list]) => list);
-  const common = commonSlots(all, { alternatives });
-  const rowSlots = BOARD_SLOTS.filter((slot) => !(slot in common));
-
-  const description = [
-    Object.keys(common).length > 0
-      ? `**Everyone** \u2014 ${Object.entries(common)
-          .map(([slot, text]) => `${SLOT_LABELS[slot]}: ${text}`)
-          .join(' \u00b7 ')}`
-      : null,
-    rowSlots.length > 0 ? `_Each spec: ${rowSlots.map((slot) => SLOT_LABELS[slot]).join(' \u00b7 ')}_` : null,
-    signedUp.size > 0
-      ? `${SIGNED_MARK} someone is signed up as this spec.`
-      : '_Nobody is signed up to an open raid right now._',
-  ]
-    .filter(Boolean)
-    .join('\n');
-
-  const embed = new EmbedBuilder()
-    .setColor(BRAND_COLOR)
-    .setTitle(`Consumables \u2014 ${dataset.tier?.name ?? 'current tier'}`.slice(0, LIMITS.title))
-    .setDescription(description)
-    .setFooter({ text: FOOTER });
-
-  for (const [className, list] of grouped) {
-    const lines = list.map((resolved) =>
-      specLine({ resolved, slots: rowSlots, signed: signedUp.has(resolved.spec.key), alternatives }),
-    );
-    embed.addFields({ name: className, value: fit(lines, fieldBudget) });
-  }
-
-  return embed;
-}
-
-/**
- * Join lines to fit one field, dropping whole rows rather than cutting a row
- * mid-item: half an item name reads as a real item and sends someone to the
- * auction house for something that does not exist.
- */
-export function fit(lines, limit) {
-  const kept = [];
+export function spill(name, lines, budget = LIMITS.fieldValue) {
+  const fields = [];
+  let current = [];
   let length = 0;
 
-  for (const [index, line] of lines.entries()) {
-    const rest = `_\u2026${lines.length - index} more, see \`/consumables spec\`_`;
+  const label = () => (fields.length === 0 ? name : '\u2937').slice(0, LIMITS.fieldName);
 
-    // Room for this row, or room for the note saying the rest did not fit --
-    // the note has to be paid for out of the same budget, or the field that
-    // was trimmed to fit ends up one line over the limit again.
-    if (length + line.length + 1 > limit - rest.length - 1) {
-      kept.push(rest);
-      break;
+  for (const line of lines) {
+    if (current.length > 0 && length + line.length + 1 > budget) {
+      fields.push({ name: label(), value: current.join('\n') });
+      current = [];
+      length = 0;
     }
 
-    kept.push(line);
+    current.push(line);
     length += line.length + 1;
   }
 
-  return kept.join('\n') || '_nothing recorded_';
+  fields.push({ name: label(), value: current.join('\n').slice(0, budget) || '\u2014' });
+
+  return fields;
+}
+
+export function buildBoardEmbed({ dataset, overrides = {}, reports = null, config = {}, now = Date.now() }) {
+  const rosters = openRaids(config, now).map((raid) => ({
+    raid,
+    rows: rosterSpecs(raid).map((entry) => ({
+      ...entry,
+      resolved: resolveSpecConsumables({ spec: entry.spec, dataset, overrides, reports }),
+    })),
+  }));
+
+  return assemble({ rosters, dataset });
+}
+
+function assemble({ rosters, dataset, alternatives = false }) {
+  const embed = new EmbedBuilder()
+    .setColor(BRAND_COLOR)
+    .setTitle(`Raid consumables — ${dataset.tier?.name ?? 'current tier'}`.slice(0, LIMITS.title))
+    .setFooter({ text: FOOTER });
+
+  const everyone = rosters.flatMap(({ rows }) => rows.map((row) => row.resolved));
+
+  if (everyone.length === 0) {
+    embed.setDescription(
+      [
+        '_Nothing is signed up right now._',
+        '',
+        'This fills in by itself as people sign up to an open raid. Start one with `/raid create`,',
+        'or look a single spec up any time with `/consumables spec`.',
+      ].join('\n'),
+    );
+
+    return embed;
+  }
+
+  const common = commonSlots(everyone, { alternatives });
+  const rowSlots = BOARD_SLOTS.filter((slot) => !(slot in common));
+
+  const shared = Object.entries(common).filter(([, entry]) => entry.all);
+  const mostly = Object.entries(common).filter(([, entry]) => !entry.all);
+
+  embed.setDescription(
+    [
+      shared.length > 0 ? `**Everyone** — ${slotSummary(shared)}` : null,
+      mostly.length > 0 ? `**Most specs** — ${slotSummary(mostly)}` : null,
+      rowSlots.length > 0
+        ? `_Then per spec: ${rowSlots.map((slot) => SLOT_LABELS[slot]).join(' · ')}. ×N is how many are bringing it._`
+        : '_Everybody needs the same things this tier._',
+    ]
+      .filter(Boolean)
+      .join('\n'),
+  );
+
+  // Every raid rendered first, then as many as fit. Soonest first, because the
+  // raid people are shopping for tonight matters more than the alt run on
+  // Sunday -- and a message over any of Discord's ceilings is not delivered at
+  // all, so something has to give.
+  const groups = rosters.map(({ raid, rows }) => {
+    const when = raid.startsAt
+      ? `${discordTime(new Date(raid.startsAt), 'F')} · ${discordTime(new Date(raid.startsAt), 'R')}`
+      : null;
+
+    const lines = [when, ...rows.map((row) => rosterLine({ ...row, slots: rowSlots, alternatives }))].filter(
+      Boolean,
+    );
+
+    if (rows.length === 0) lines.push('_Nobody signed up yet._');
+
+    return { raid, fields: spill(raid.title ?? raid.id, lines) };
+  });
+
+  const omitted = [];
+  let size = embedSize(embed);
+  let count = 0;
+
+  for (const group of groups) {
+    const cost = group.fields.reduce((sum, field) => sum + field.name.length + field.value.length, 0);
+
+    // One field and a couple of hundred characters held back for the note that
+    // says what was left out. A board that silently drops a raid is worse than
+    // one that admits it could not fit it.
+    if (count + group.fields.length > LIMITS.fields - 1 || size + cost > LIMITS.total - OMITTED_BUDGET) {
+      omitted.push(group.raid.title ?? group.raid.id);
+      continue;
+    }
+
+    for (const field of group.fields) embed.addFields(field);
+    size += cost;
+    count += group.fields.length;
+  }
+
+  if (omitted.length > 0) {
+    embed.addFields({
+      name: 'Not shown',
+      value: `${omitted.join(', ')} — too much for one message. Close the raids that are done, or ask for one at a time with \`/consumables shopping raid:…\`.`.slice(
+        0,
+        LIMITS.fieldValue,
+      ),
+    });
+  }
+
+  return embed;
+}
+
+function slotSummary(entries) {
+  return entries.map(([slot, entry]) => `${SLOT_LABELS[slot]}: ${entry.text}`).join(' · ');
 }
 
 /** Total characters Discord counts against the 6000 ceiling. */
 export function embedSize(embed) {
   const data = embed.toJSON ? embed.toJSON() : embed;
+
   return (
     (data.title?.length ?? 0) +
     (data.description?.length ?? 0) +
@@ -205,7 +276,7 @@ export function embedSize(embed) {
 /**
  * A stable fingerprint of what the board says. Kept in the store so an
  * interaction that changed nothing the board shows -- `/consumables spec`, a
- * signup by a spec already on the roster -- does not spend an edit call.
+ * fifth mage joining a raid that already had four -- does not spend an edit.
  */
 export function boardHash(embed) {
   const data = embed.toJSON ? embed.toJSON() : embed;
@@ -215,13 +286,14 @@ export function boardHash(embed) {
 /** Render the board from a guild's current state, without touching Discord. */
 export async function renderBoard(guildId, { store, dataset }) {
   const config = await store.get(guildId);
+
   return {
     config,
     embed: buildBoardEmbed({
       dataset,
+      config,
       overrides: config.consumables?.overrides ?? {},
       reports: mergeReports(dataset.reports, config.consumables?.reports),
-      signedUp: signedUpSpecKeys(config),
     }),
   };
 }
