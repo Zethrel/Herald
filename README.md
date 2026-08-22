@@ -22,6 +22,11 @@ for years.
 servers on its allowlist and reports itself to its owners anywhere else. See
 [Approved servers](#approved-servers) and [Licence](#licence).
 
+**Only want the raids and the consumables?** Points 1 to 3 above are optional.
+[Raids and consumables, nothing else](docs/raids-and-consumables.md) is the short
+version for a guild that already has its own server: four things once, two
+commands a raid night, and which of the invite permissions they can refuse.
+
 > Named for the guild it was built for, and for the job: a quartermaster runs
 > the roster and the provisions. The name lives in one place — `BOT_NAME` and
 > `BOT_SHORT_NAME` in `.env`, falling back to `src/branding.js` — so another
