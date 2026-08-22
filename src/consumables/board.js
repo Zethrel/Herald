@@ -22,10 +22,15 @@ import { mergeReports } from '../sources/compare.js';
 import { resolveSpecConsumables } from './resolve.js';
 import { specByKey } from '../game/specs.js';
 
-// The four a raider actually has to buy. The optional slots -- health and mana
-// potions, augment rune -- stay on `/consumables spec`: on a board they are the
-// difference between a list people read and one they scroll past.
-export const BOARD_SLOTS = ['flask', 'food', 'potion', 'oil'];
+// The four a raider actually has to buy, in the order they are read out on a
+// raid night. The optional slots -- health and mana potions, augment rune --
+// stay on `/consumables spec`: on a board they are the difference between a
+// list people read and one they scroll past.
+//
+// Deliberately not the order `/consumables spec` uses. That reply is a
+// reference for one spec; this is a shopping list, and the food is what people
+// forget.
+export const BOARD_SLOTS = ['food', 'flask', 'potion', 'oil'];
 
 // Raid order, and the same icons the raid post uses. A board that sorts its
 // people differently from the signup sheet above it makes two lists nobody can
